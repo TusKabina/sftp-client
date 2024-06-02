@@ -1,11 +1,17 @@
 #include <QApplication>
 #include <QPushButton>
+#include <QMessageBox>
 
-int main(int argc, char *argv[])
-{
+void handleButton() {
+    QMessageBox::information(nullptr, "Hello", "Hello Linux!");
+}
+
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
-    QPushButton button("Hello, Qt!");
+    QPushButton button("Click Me!");
+    QObject::connect(&button, &QPushButton::clicked, handleButton);
+
     button.resize(200, 100);
     button.show();
 
