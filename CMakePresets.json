@@ -18,7 +18,6 @@
         "Qt5_DIR": "/home/irogulj/Qt/5.15.2/gcc_64/lib/cmake/Qt5"
       },
       "environment": {
-        "QT_DEBUG_PLUGINS": "1",
         "QT_QPA_PLATFORM_PLUGIN_PATH": "/home/irogulj/Qt/5.15.2/gcc_64/plugins/platforms"
       }
     },
@@ -49,7 +48,7 @@
   ],
   "vendor": {
     "qt-project.org/Presets": {
-      "checksum": "RX1H75pqAIwzo/2LIij6hAx5M+4="
+      "checksum": "w1EQWUFxDmDSiGMPYlGFSl3GGGI="
     }
   }
 }

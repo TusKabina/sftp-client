@@ -30,3 +30,42 @@
 *.exe
 *.out
 *.app
+
+# CLion
+.idea/.name
+.idea/misc.xml
+# VS
+.vs/
+out/
+
+# CMake
+cmake-build-debug/.ninja_deps
+cmake-build-debug/.ninja_log
+cmake-build-debug/build.ninja
+cmake-build-debug/cmake_install.cmake
+cmake-build-debug/CMakeCache.txt
+cmake-build-debug/sftp_interface
+cmake-build-debug/.cmake/api/v1/query/cache-v2
+cmake-build-debug/.cmake/api/v1/query/cmakeFiles-v1
+cmake-build-debug/.cmake/api/v1/query/codemodel-v2
+cmake-build-debug/.cmake/api/v1/query/toolchains-v1
+cmake-build-debug/.cmake/api/v1/reply/cache-v2-9763b3f69214349e389b.json
+cmake-build-debug/.cmake/api/v1/reply/cmakeFiles-v1-0bab92fd9eb7eb7105c1.json
+cmake-build-debug/.cmake/api/v1/reply/codemodel-v2-2857d95cd33c6600f1b9.json
+cmake-build-debug/.cmake/api/v1/reply/directory-.-Debug-f5ebdc15457944623624.json
+cmake-build-debug/.cmake/api/v1/reply/index-2024-05-16T20-31-25-0589.json
+cmake-build-debug/.cmake/api/v1/reply/target-sftp_interface-Debug-7a3ef111a0e4bfc3bac6.json
+cmake-build-debug/.cmake/api/v1/reply/toolchains-v1-484ee006d7b0fae39e6a.json
+cmake-build-debug/CMakeFiles/clion-Debug-log.txt
+cmake-build-debug/CMakeFiles/clion-environment.txt
+cmake-build-debug/CMakeFiles/cmake.check_cache
+cmake-build-debug/CMakeFiles/CMakeConfigureLog.yaml
+cmake-build-debug/CMakeFiles/rules.ninja
+cmake-build-debug/CMakeFiles/TargetDirectories.txt
+cmake-build-debug/CMakeFiles/3.28.1/CMakeCXXCompiler.cmake
+cmake-build-debug/CMakeFiles/3.28.1/CMakeDetermineCompilerABI_CXX.bin
+cmake-build-debug/CMakeFiles/3.28.1/CMakeSystem.cmake
+cmake-build-debug/CMakeFiles/3.28.1/CompilerIdCXX/CMakeCXXCompilerId.cpp
+cmake-build-debug/Testing/Temporary/LastTest.log
+CMakeFiles/cmake.check_cache
+CMakeSettings.json
