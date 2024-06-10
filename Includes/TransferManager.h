@@ -42,6 +42,7 @@ public:
     [[nodiscard]] const std::vector<DirectoryEntry> getDirectoryList(const std::string& path = "");
     [[nodiscard]] uint64_t prepareJob(const std::string& localPath, const std::string& remotePath);
     [[nodiscard]] bool isInitialized() const { return m_initialized; }
+    [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_DirectoryCache.getCache(); }
     void connect(const std::string& host, const std::string& username, std::string& password);
     ~TransferManager();
 };

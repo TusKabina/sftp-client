@@ -28,6 +28,7 @@ public:
     [[nodiscard]] bool initialize(const std::string& url, const std::string& user, std::string& password);
     [[nodiscard]] bool isPathInCache(const std::string& path) const { return m_cache.find(path) != m_cache.end(); }
     [[nodiscard]] bool isInitialized() { return m_initialized; }
+    [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_cache; }
     bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const;
     
     void prefetchDirectories(const std::string& path, int depth);

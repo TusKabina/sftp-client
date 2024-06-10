@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <filesystem>
+#include <QHeaderView>
 
 std::string GetDirectoryName(const std::string& name) {
 	size_t pos = name.find_last_of("\\/");
@@ -120,6 +121,7 @@ void TreeWidget::mousePressEvent(QMouseEvent* event) {
 void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_TextCommandParameterLocal = ((QFileSystemModel*)m_TreeView->model())->filePath(index);
+		auto strParameterLocal = m_TextCommandParameterLocal.toStdString();;
 		std::filesystem::path p = m_TextCommandParameterLocal.toStdString();
 		if (std::filesystem::is_regular_file(p)) {
 			m_LocalFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
@@ -145,20 +147,21 @@ void TreeViewWidget::OnConnectButtonClicked() {
 		m_TextDebugLog.append("Connected");
 		m_ConnectDisconnectButton->setText("Disconnected");
 
-		auto entries = m_manager.getDirectoryList("/");
+		//auto entries = m_manager.getDirectoryList("/");
 
-		for (const auto& entry : entries) {
-			//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
-			if (entry.m_isDirectory) {			
-				QTreeWidgetItem* root = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-				QPixmap pixmap("dir.png");			
-				root->setIcon(0, pixmap);
-				m_TreeWidget->addTopLevelItem(root);
-			}
-			else {
+		//for (const auto& entry : entries) {
+		//	//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
+		//	if (entry.m_isDirectory) {			
+		//		QTreeWidgetItem* root = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+		//		QPixmap pixmap("dir.png");			
+		//		root->setIcon(0, pixmap);
+		//		m_TreeWidget->addTopLevelItem(root);
+		//	}
+		//	else {
 
-			}
-		}
+		//	}
+		//}
+		populateTreeView();
 	}
 	else {
 		m_TextDebugLog.append("Disconnected");
@@ -182,26 +185,26 @@ void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 	std::string newPath = fullPath.toStdString();
 	newPath = "/" + newPath + "/";
 	
-	auto entries = m_manager.getDirectoryList(newPath);
+	//auto entries = m_manager.getDirectoryList(newPath);
 
-	for (const auto& entry : entries) {
-		//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
-		if (entry.m_isDirectory && !entry.m_isSymLink) {
-			QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-			QPixmap pixmap("dir.png");
-			child->setIcon(0, pixmap);
-			item->addChild(child);
-		}
-		else if (!entry.m_isDirectory && !entry.m_isSymLink) {
-			QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-			QPixmap pixmap("file.png");
-			child->setIcon(0, pixmap);
-			item->addChild(child);
-		}
-		else {
+	//for (const auto& entry : entries) {
+	//	//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
+	//	if (entry.m_isDirectory && !entry.m_isSymLink) {
+	//		QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+	//		QPixmap pixmap("dir.png");
+	//		child->setIcon(0, pixmap);
+	//		item->addChild(child);
+	//	}
+	//	else if (!entry.m_isDirectory && !entry.m_isSymLink) {
+	//		QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+	//		QPixmap pixmap("file.png");
+	//		child->setIcon(0, pixmap);
+	//		item->addChild(child);
+	//	}
+	//	else {
 
-		}
-	}
+	//	}
+	//}
 
 	m_TextCommandParameterRemote = fullPath;
 }
@@ -278,12 +281,14 @@ TreeViewWidget::TreeViewWidget() {
 	connect(m_TreeView, SIGNAL(RightClickAction(QMouseEvent*)),
 		this, SLOT(OnRightClickedAction(QMouseEvent*)));
 	m_TreeView->setModel(dirModel);
-	//QModelIndex idx = dirModel->index(":: {CLSID}");
 	QModelIndex idx = dirModel->index("/");
 	m_TreeView->setRootIndex(idx);
-	m_TreeView->hideColumn(1);
-	m_TreeView->hideColumn(2);
-	m_TreeView->hideColumn(3);
+	//m_TreeView->hideColumn(1);
+	//m_TreeView->hideColumn(2);
+	//m_TreeView->hideColumn(3);
+	m_TreeView->setSortingEnabled(true);
+	m_TreeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_TreeView->header()->setSortIndicatorShown(true);
 	m_TreeView->selectionModel();
 
 	//Tree widget for remote machine files
@@ -391,4 +396,68 @@ TreeViewWidget::TreeViewWidget() {
 
 	//Set vertical layout as main layout
 	setLayout(verticalLayout);
+}
+
+void TreeViewWidget::populateTreeView() {
+	auto& cache = m_manager.getCache();
+	for (const auto& pair : cache) {
+		const QString path = QString::fromStdString(pair.first);
+		std::string pathInPopulate = path.toStdString();
+		const auto& entries = pair.second;
+		QTreeWidgetItem* root = findOrCreateRoot(path);
+		for (const auto& entry : entries) {
+			auto& strEntry = entry.m_name;
+			if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+				continue;
+			}
+			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+			if (entry.m_isDirectory) {
+				item->setIcon(0, QPixmap("dir.png"));
+			}
+			else {
+				item->setIcon(0, QPixmap("file.png"));
+			}
+			root->addChild(item);
+		}
+	}
+}
+
+QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path)
+{
+	QStringList parts = path.split('/', QString::SkipEmptyParts);
+	auto strPath = path.toStdString();
+	QTreeWidgetItem* root = nullptr;
+
+	for (const auto& part : parts) {
+		bool found = false;
+		if (!root) {
+			for (int i = 0; i < m_TreeWidget->topLevelItemCount(); i++) {
+				if (m_TreeWidget->topLevelItem(i)->text(0) == part) {
+					root = m_TreeWidget->topLevelItem(i);
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				root = new QTreeWidgetItem(QStringList(part));
+				m_TreeWidget->addTopLevelItem(root);
+			}
+		}
+		else {
+			for (int i = 0; i < root->childCount(); i++) {
+				if (root->child(i)->text(0) == part) {
+					root = root->child(i);
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(part));
+				root->addChild(child);
+				root = child;
+			}
+		}
+		
+	}
+	return root ? root : m_TreeWidget->invisibleRootItem();
 }

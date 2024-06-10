@@ -141,6 +141,10 @@ public slots:
 	void EventFromThreadPoolReceived(int);
 public:
 	TreeViewWidget();
+	void populateTreeView();
+private:
+	QTreeWidgetItem* findOrCreateRoot(const QString& path);
+
 private:
 	TreeView* m_TreeView;
 	TreeWidget* m_TreeWidget;
