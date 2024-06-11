@@ -42,6 +42,7 @@ private:
     static size_t writeCallback(void* buffer, size_t size, size_t nmemb, std::string& data);
     static size_t dummyWriteCallback(void* buffer, size_t size, size_t nmemb, void* data) { return size * nmemb; }
     void parseResponse(std::vector<DirectoryEntry>& entries, const std::string& response);
+
 };
 
 #endif // SFTP_INTERFACE_DIRECTORYCACHE_H

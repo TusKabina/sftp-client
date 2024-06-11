@@ -118,22 +118,6 @@ void TreeWidget::mousePressEvent(QMouseEvent* event) {
 	}
 }
 
-void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
-	if (index.isValid()) {
-		m_TextCommandParameterLocal = ((QFileSystemModel*)m_TreeView->model())->filePath(index);
-		auto strParameterLocal = m_TextCommandParameterLocal.toStdString();
-		std::filesystem::path p = m_TextCommandParameterLocal.toStdString();
-		if (std::filesystem::is_regular_file(p)) {
-			m_LocalFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
-		}
-		else {
-			m_LocalFileToUploadLineEdit->clear();
-		}
-		m_DirectoryNameLocal = GetDirectoryName(((QFileSystemModel*)m_TreeView->model())->filePath(index).toStdString()).c_str();
-		m_DirectoryNameLocal += "/";
-		m_LocalFolderLineEdit->setText(m_DirectoryNameLocal);
-	}
-}
 
 void TreeViewWidget::OnConnectButtonClicked() {
 	std::string host = m_SftpServerNameLineEdit->text().toStdString();
@@ -174,6 +158,23 @@ void TreeViewWidget::EventFromThreadPoolReceived(int id) {
 	std::cout << "TreeViewWidget " << this_id << " " << id << " thread...\n";
 }
 
+void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
+	if (index.isValid()) {
+		m_TextCommandParameterLocal = ((QFileSystemModel*)m_TreeView->model())->filePath(index);
+		auto strParameterLocal = m_TextCommandParameterLocal.toStdString();
+		std::filesystem::path p = m_TextCommandParameterLocal.toStdString();
+		if (std::filesystem::is_regular_file(p)) {
+			m_LocalFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
+		}
+		else {
+			m_LocalFileToUploadLineEdit->clear();
+		}
+		m_DirectoryNameLocal = GetDirectoryName(((QFileSystemModel*)m_TreeView->model())->filePath(index).toStdString()).c_str();
+		m_DirectoryNameLocal += "/";
+		m_LocalFolderLineEdit->setText(m_DirectoryNameLocal);
+	}
+}
+
 void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int index) {
 	QString fullPath = item->text(0);
 
@@ -185,12 +186,16 @@ void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 	std::string newPath = fullPath.toStdString();
 	newPath = "/" + newPath;
 	if (m_manager.isRegularFile(newPath)) {
-		m_RemoteFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
+		m_RemoteFileToUploadLineEdit->setText("/"+ fullPath);
+	}
+	else {
+		m_RemoteFileToUploadLineEdit->clear();
 	}
 	m_TextCommandParameterRemote = fullPath;
-	m_RemoteFileToUploadLineEdit->setText("/" + m_TextCommandParameterRemote + "/");
-	m_DirectoryNameRemote = QString::fromStdString(GetDirectoryName(m_TextCommandParameterRemote.toStdString()));
-	m_RemoteFolderLineEdit->setText("/" + m_DirectoryNameRemote);
+	//m_RemoteFileToUploadLineEdit->setText("/" + m_TextCommandParameterRemote + "/");
+	m_DirectoryNameRemote = "/" + QString::fromStdString(GetDirectoryName(m_TextCommandParameterRemote.toStdString()));
+	m_DirectoryNameRemote += m_DirectoryNameRemote == "/" ? "" : "/";
+	m_RemoteFolderLineEdit->setText(m_DirectoryNameRemote);
 }
 
 void TreeViewWidget::OnRightClickedAction(QMouseEvent* event) {
@@ -210,8 +215,6 @@ void TreeViewWidget::OnRightClickedAction(QMouseEvent* event) {
 			m_TextDebugLog.append("Remote directory: " + m_DirectoryNameRemote);
 
 			auto func = [=]() {
-				uint64_t downloadJobId = m_manager.prepareJob(m_TextCommandParameterLocal.toStdString(), directoryNameRemote);
-				m_manager.executeJob(downloadJobId, JobOperation::UPLOAD);
 				std::thread::id this_id = std::this_thread::get_id();
 				std::cout << "thread " << this_id << " func...\n";
 			};
@@ -228,17 +231,29 @@ void TreeViewWidget::OnRightClickedAction(QMouseEvent* event) {
 void TreeViewWidget::OnRightClickedActionTreeWidget(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pDownload = menu.addAction(trUtf8("Download"));
+	QAction* Pdelete = menu.addAction(trUtf8("Delete"));
 
 	QAction* pSelected = menu.exec(m_TreeWidget->mapToGlobal(event->pos()));
 
 	if (pSelected == pDownload) {
 		std::filesystem::path p = m_TextCommandParameterRemote.toStdString();
+		std::string strPath = m_TextCommandParameterRemote.toStdString();
+		if (strPath.front() != '/') {
+			strPath = "/" + strPath;
+		}
+		if (m_manager.isRegularFile(strPath)) {
+			std::string remotePath = "/" + m_TextCommandParameterRemote.toStdString();
+			size_t pos = remotePath.find_last_of("/");
+			std::string remoteFileName = remotePath.substr(pos + 1, remotePath.size());
 
-		if (std::filesystem::is_regular_file(p)) {
-			m_TextDebugLog.append("Downloading: " + m_TextCommandParameterLocal);
-			m_TextDebugLog.append("Local directory: " + m_DirectoryNameLocal);
+			m_TextDebugLog.append("Downloading: /" + m_TextCommandParameterRemote);
+			m_TextDebugLog.append("Local directory: " + m_DirectoryNameLocal + QString::fromStdString(remoteFileName));
 
-			auto func = []() {
+			auto func = [=]() {
+				std::string localPath = m_DirectoryNameLocal.toStdString() + remoteFileName;
+				
+				uint64_t downloadJobId = m_manager.prepareJob(localPath, remotePath);
+				m_manager.executeJob(downloadJobId, JobOperation::DOWNLOAD);
 				std::thread::id this_id = std::this_thread::get_id();
 				std::cout << "thread " << this_id << " func...\n";
 			};
@@ -249,6 +264,9 @@ void TreeViewWidget::OnRightClickedActionTreeWidget(QMouseEvent* event) {
 			m_TextDebugLog.append("ERROR: not file -->" + m_TextCommandParameterLocal);
 			m_TextDebugLog.append("Local directory: " + m_DirectoryNameLocal);
 		}
+	}
+	else if (pSelected == Pdelete) {
+		//TODO
 	}
 }
 

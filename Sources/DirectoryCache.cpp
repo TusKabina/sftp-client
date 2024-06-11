@@ -84,14 +84,21 @@ bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<Dir
 }
 
 bool DirectoryCache::isRegularFile(const std::string& filePath) {
-    size_t pos = filePath.find_last_of("/");
-    std::string fileName = filePath.substr(0, pos);
-
+   /* size_t pos = filePath.find_last_of("/");
+    std::string fileName = filePath.substr(0, pos + 1);
+    if (isPathInCache(filePath + "/")) {
+        return false;
+    }
+    if (!isPathInCache(fileName + "/")) {
+        return false;
+    }
     std::vector<DirectoryEntry> entries = m_cache.at(filePath + "/");
-    auto file = std::find_if(entries.begin(), entries.end(), [&fileName](const std::string& name) {
-        return name == fileName; });
+    auto file = std::find_if(entries.begin(), entries.end(), [&fileName](const DirectoryEntry& entry) {
+        return entry.m_name == fileName; });
 
-    return file != entries.end() && file->m_isDirectory;
+    return file != entries.end() && file->m_isDirectory;*/
+
+    return !isPathInCache(filePath + "/");
 }
 
 void DirectoryCache::refreshDirectory(const std::string& path) {
