@@ -17,10 +17,11 @@ file(GLOB SOURCE_FILES "Sources/*.cpp")
 # Find the Qt5 package
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(CURL REQUIRED)
+# Enable automatic invocation of MOC
+set(CMAKE_AUTOMOC ON)
 
 # Add the executable
 add_executable(SftpClient main.cpp 
-        moc/moc_mainGui.cpp
         Includes/mainGui.h 
         Includes/HandleDeleter.h
         Includes/TransferJob.h

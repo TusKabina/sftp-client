@@ -30,7 +30,8 @@ public:
     [[nodiscard]] bool isInitialized() { return m_initialized; }
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_cache; }
     bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const;
-    
+    bool isRegularFile(const std::string& filePath);
+
     void prefetchDirectories(const std::string& path, int depth);
     void refreshDirectory(const std::string& path);
 

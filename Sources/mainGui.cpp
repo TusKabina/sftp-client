@@ -121,7 +121,7 @@ void TreeWidget::mousePressEvent(QMouseEvent* event) {
 void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_TextCommandParameterLocal = ((QFileSystemModel*)m_TreeView->model())->filePath(index);
-		auto strParameterLocal = m_TextCommandParameterLocal.toStdString();;
+		auto strParameterLocal = m_TextCommandParameterLocal.toStdString();
 		std::filesystem::path p = m_TextCommandParameterLocal.toStdString();
 		if (std::filesystem::is_regular_file(p)) {
 			m_LocalFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
@@ -183,47 +183,35 @@ void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 	}
 
 	std::string newPath = fullPath.toStdString();
-	newPath = "/" + newPath + "/";
-	
-	//auto entries = m_manager.getDirectoryList(newPath);
-
-	//for (const auto& entry : entries) {
-	//	//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
-	//	if (entry.m_isDirectory && !entry.m_isSymLink) {
-	//		QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-	//		QPixmap pixmap("dir.png");
-	//		child->setIcon(0, pixmap);
-	//		item->addChild(child);
-	//	}
-	//	else if (!entry.m_isDirectory && !entry.m_isSymLink) {
-	//		QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-	//		QPixmap pixmap("file.png");
-	//		child->setIcon(0, pixmap);
-	//		item->addChild(child);
-	//	}
-	//	else {
-
-	//	}
-	//}
-
+	newPath = "/" + newPath;
+	if (m_manager.isRegularFile(newPath)) {
+		m_RemoteFileToUploadLineEdit->setText(m_TextCommandParameterLocal);
+	}
 	m_TextCommandParameterRemote = fullPath;
+	m_RemoteFileToUploadLineEdit->setText("/" + m_TextCommandParameterRemote + "/");
+	m_DirectoryNameRemote = QString::fromStdString(GetDirectoryName(m_TextCommandParameterRemote.toStdString()));
+	m_RemoteFolderLineEdit->setText("/" + m_DirectoryNameRemote);
 }
 
 void TreeViewWidget::OnRightClickedAction(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pUpload = menu.addAction(trUtf8("Upload"));
-
+	std::string fullPath;
+	
 	QAction* pSelected = menu.exec(m_TreeView->mapToGlobal(event->pos()));
-
+	
 	if (pSelected == pUpload)
 	{
 		std::filesystem::path p = m_TextCommandParameterLocal.toStdString();
-
+		std::string localPath  = m_TextCommandParameterLocal.toStdString();
+		std::string directoryNameRemote = m_DirectoryNameRemote.toStdString() + "/test123.test";
 		if (std::filesystem::is_regular_file(p)) {
 			m_TextDebugLog.append("Uploading: " + m_TextCommandParameterLocal);
 			m_TextDebugLog.append("Remote directory: " + m_DirectoryNameRemote);
 
-			auto func = []() {
+			auto func = [=]() {
+				uint64_t downloadJobId = m_manager.prepareJob(m_TextCommandParameterLocal.toStdString(), directoryNameRemote);
+				m_manager.executeJob(downloadJobId, JobOperation::UPLOAD);
 				std::thread::id this_id = std::this_thread::get_id();
 				std::cout << "thread " << this_id << " func...\n";
 			};
@@ -413,17 +401,18 @@ void TreeViewWidget::populateTreeView() {
 			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 			if (entry.m_isDirectory) {
 				item->setIcon(0, QPixmap("dir.png"));
+				item->setData(0, Qt::UserRole, true);
 			}
 			else {
 				item->setIcon(0, QPixmap("file.png"));
+				item->setData(0, Qt::UserRole, false);
 			}
 			root->addChild(item);
 		}
 	}
 }
 
-QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path)
-{
+QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
 	QStringList parts = path.split('/', QString::SkipEmptyParts);
 	auto strPath = path.toStdString();
 	QTreeWidgetItem* root = nullptr;

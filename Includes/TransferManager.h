@@ -43,7 +43,9 @@ public:
     [[nodiscard]] uint64_t prepareJob(const std::string& localPath, const std::string& remotePath);
     [[nodiscard]] bool isInitialized() const { return m_initialized; }
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_DirectoryCache.getCache(); }
+    [[nodiscard]] const std::string& getUsername() { return m_username; }
     void connect(const std::string& host, const std::string& username, std::string& password);
+    bool isRegularFile(const std::string& filePath) { return m_DirectoryCache.isRegularFile(filePath); }
     ~TransferManager();
 };
 #endif //SFTP_INTERFACE_TRANSFERMANAGER_H

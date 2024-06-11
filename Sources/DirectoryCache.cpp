@@ -1,6 +1,7 @@
 #include "DirectoryCache.h"
 #include <iostream> //TODO: DELETE
 #include <sstream>
+#include <algorithm>
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
     m_curlCode = 0;
@@ -80,6 +81,17 @@ bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<Dir
         return true;
     }
     return false;
+}
+
+bool DirectoryCache::isRegularFile(const std::string& filePath) {
+    size_t pos = filePath.find_last_of("/");
+    std::string fileName = filePath.substr(0, pos);
+
+    std::vector<DirectoryEntry> entries = m_cache.at(filePath + "/");
+    auto file = std::find_if(entries.begin(), entries.end(), [&fileName](const std::string& name) {
+        return name == fileName; });
+
+    return file != entries.end() && file->m_isDirectory;
 }
 
 void DirectoryCache::refreshDirectory(const std::string& path) {
