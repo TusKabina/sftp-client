@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <qobject.h>
 struct DirectoryEntry {
     std::string m_name;
     uint64_t m_totalBytes;
@@ -14,21 +13,16 @@ struct DirectoryEntry {
     bool m_isSymLink = false;
 };
 
-class DirectoryCache : public QObject {
-    Q_OBJECT
+class DirectoryCache {
 private:
     CurlUniquePtr m_curlHandle;
     int m_curlCode;
     std::string m_baseUrl;
     std::map<std::string, std::vector<DirectoryEntry>> m_cache;
     bool m_initialized;
-signals:
-    // used to signal TreeWidget to sync
-    void directoryCacheUpdated(const std::string& path);
 
 public:
     DirectoryCache() {}
-    DirectoryCache(QObject* parent) : QObject(parent) {}
 
     [[nodiscard]] bool initialize(const std::string& url, const std::string& user, std::string& password);
     [[nodiscard]] bool isPathInCache(const std::string& path) const { return m_cache.find(path) != m_cache.end(); }

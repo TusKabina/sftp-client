@@ -1,7 +1,7 @@
 #include <QApplication>
 #include <QPushButton>
 #include <QMessageBox>
-#include "mainGui.h"
+#include "Qt/mainGui.h"
 void handleButton() {
     QMessageBox::information(nullptr, "Hello", "Hello Linux!");
 }

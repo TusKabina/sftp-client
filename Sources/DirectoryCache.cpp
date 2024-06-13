@@ -52,10 +52,8 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     }
 }
 
-void DirectoryCache::updateDirectoryCache(const std::string& path, int depth)
-{
+void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
     prefetchDirectories(path, depth);
-    emit directoryCacheUpdated(path);
 }
 
 std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& path)
