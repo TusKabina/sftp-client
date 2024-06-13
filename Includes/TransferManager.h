@@ -38,6 +38,7 @@ public:
     void setCredentials(const std::string& host, const std::string& username, const std::string& password);
     void executeJob(uint64_t jobId, JobOperation jobType);
     void deleteJob(uint64_t jobId);
+    void updateCacheDirectory(const std::string& path) { m_DirectoryCache.updateDirectoryCache(path, 3); }
 
     [[nodiscard]] const std::vector<DirectoryEntry> getDirectoryList(const std::string& path = "");
     [[nodiscard]] uint64_t prepareJob(const std::string& localPath, const std::string& remotePath);
@@ -45,6 +46,7 @@ public:
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_DirectoryCache.getCache(); }
     [[nodiscard]] const std::string& getUsername() { return m_username; }
     [[nodiscard]] bool isRegularFile(const std::string& filePath) { return m_DirectoryCache.isRegularFile(filePath); }
+    [[nodiscard]] const DirectoryCache* getDirectoryCacheObject() const { return &m_DirectoryCache; }
     void connect(const std::string& host, const std::string& username, std::string& password);
     ~TransferManager();
 };

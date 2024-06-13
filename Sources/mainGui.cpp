@@ -130,21 +130,6 @@ void TreeViewWidget::OnConnectButtonClicked() {
 	if (m_IsConnected) {
 		m_TextDebugLog.append("Connected");
 		m_ConnectDisconnectButton->setText("Disconnected");
-
-		//auto entries = m_manager.getDirectoryList("/");
-
-		//for (const auto& entry : entries) {
-		//	//std::cout << (entry.m_isDirectory ? "[DIR] " : "[FILE] ") << entry.m_name << std::endl;
-		//	if (entry.m_isDirectory) {			
-		//		QTreeWidgetItem* root = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-		//		QPixmap pixmap("dir.png");			
-		//		root->setIcon(0, pixmap);
-		//		m_TreeWidget->addTopLevelItem(root);
-		//	}
-		//	else {
-
-		//	}
-		//}
 		populateTreeView();
 	}
 	else {
@@ -156,6 +141,11 @@ void TreeViewWidget::OnConnectButtonClicked() {
 void TreeViewWidget::EventFromThreadPoolReceived(int id) {
 	std::thread::id this_id = std::this_thread::get_id();
 	std::cout << "TreeViewWidget " << this_id << " " << id << " thread...\n";
+}
+
+void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path)
+{
+	//updateTreeView(path);
 }
 
 void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
@@ -177,12 +167,16 @@ void TreeViewWidget::OnClickedTreeView(const QModelIndex& index) {
 
 void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int index) {
 	QString fullPath = item->text(0);
+	bool prefetch = (item->childCount() == 0);
 
 	while (item->parent() != NULL) {
 		fullPath = item->parent()->text(0) + "/" + fullPath;
 		item = item->parent();
 	}
-
+	if (prefetch) {
+		updateTreeView("/" + fullPath.toStdString() + "/");
+	}
+		
 	std::string newPath = fullPath.toStdString();
 	newPath = "/" + newPath;
 	if (m_manager.isRegularFile(newPath)) {
@@ -192,7 +186,6 @@ void TreeViewWidget::ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 		m_RemoteFileToUploadLineEdit->clear();
 	}
 	m_TextCommandParameterRemote = fullPath;
-	//m_RemoteFileToUploadLineEdit->setText("/" + m_TextCommandParameterRemote + "/");
 	m_DirectoryNameRemote = "/" + QString::fromStdString(GetDirectoryName(m_TextCommandParameterRemote.toStdString()));
 	m_DirectoryNameRemote += m_DirectoryNameRemote == "/" ? "" : "/";
 	m_RemoteFolderLineEdit->setText(m_DirectoryNameRemote);
@@ -331,6 +324,9 @@ TreeViewWidget::TreeViewWidget() {
 	connect(m_TreeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
 		this, SLOT(ProcessTreeWidgetItemClicked(QTreeWidgetItem*, int)));
 
+	connect(m_manager.getDirectoryCacheObject(), &DirectoryCache::directoryCacheUpdated, this,
+		&TreeViewWidget::onDirectoryCacheUpdated);
+
 	//Basic layout for widgets
 	QHBoxLayout* horizontalLayoutUserCredentials = new QHBoxLayout;
 	QHBoxLayout* horizontalLayoutUploadDownloadParameters = new QHBoxLayout;
@@ -397,6 +393,7 @@ TreeViewWidget::TreeViewWidget() {
 	connect(&m_ThreadPool, SIGNAL(WorkDone(int)),
 		this, SLOT(EventFromThreadPoolReceived(int)));
 
+
 	//Start thread pool with as many threads as u can
 	m_ThreadPool.Start(std::thread::hardware_concurrency());
 
@@ -405,6 +402,7 @@ TreeViewWidget::TreeViewWidget() {
 }
 
 void TreeViewWidget::populateTreeView() {
+	m_TreeWidget->clear();
 	auto& cache = m_manager.getCache();
 	for (const auto& pair : cache) {
 		const QString path = QString::fromStdString(pair.first);
@@ -427,6 +425,29 @@ void TreeViewWidget::populateTreeView() {
 			}
 			root->addChild(item);
 		}
+	}
+}
+
+void TreeViewWidget::updateTreeView(const std::string& path) {
+	const auto entries = m_manager.getDirectoryList(path);
+	if (entries.empty()) {
+		return;
+	}
+	QTreeWidgetItem* root = findOrCreateRoot(QString::fromStdString(path));
+	for (const auto& entry : entries) {
+		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+			continue;
+		}
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+		if (entry.m_isDirectory) {
+			item->setIcon(0, QPixmap("dir.png"));
+			item->setData(0, Qt::UserRole, true);
+		}
+		else {
+			item->setIcon(0, QPixmap("file.png"));
+			item->setData(0, Qt::UserRole, false);
+		}
+		root->addChild(item);
 	}
 }
 

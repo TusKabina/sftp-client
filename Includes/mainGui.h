@@ -139,9 +139,11 @@ public slots:
 	void OnRightClickedActionTreeWidget(QMouseEvent* event);
 	void ProcessTreeWidgetItemClicked(QTreeWidgetItem* item, int index);
 	void EventFromThreadPoolReceived(int);
+	void onDirectoryCacheUpdated(const std::string& path);
 public:
 	TreeViewWidget();
 	void populateTreeView();
+	void updateTreeView(const std::string& path);
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
 
