@@ -9,6 +9,7 @@
 class TransferHandle {
 private:
     friend class TransferJob;
+    friend class TransferManager;
     std::shared_ptr<CURL> m_curlHandle;
     TransferStatus m_transferStatus;
 

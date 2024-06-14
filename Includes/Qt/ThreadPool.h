@@ -43,12 +43,15 @@ signals:
 	void workDone(int);
 
 private:
+	//std::shared_ptr<CURL> m_curlHandle;
 	ThreadPool* m_parent;
 	int m_threadId;
 	void run() { m_parent->threadLoop(this); };
 
 public:
-	WorkerThread(ThreadPool* parent) : m_parent(parent), m_threadId(-1) {};
+	WorkerThread(ThreadPool* parent) : m_parent(parent), m_threadId(-1) {
+		//m_curlHandle = std::shared_ptr<CURL>(curl_easy_init(), curl_easy_cleanup);
+	};
 	void SetThreadId(int id) { m_threadId = id; }
 	int& GetThreadId() { return m_threadId; }
 

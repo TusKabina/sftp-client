@@ -18,6 +18,11 @@
 #include "WorkerThread.h"
 #include "ThreadPool.h"
 #include "TransferManager.h"
+#include <qdrag.h>
+#include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QMimeData>
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -26,6 +31,10 @@ signals:
 public:
 	TreeView(QWidget* parent = nullptr) : QTreeView(parent) {};
 	void mousePressEvent(QMouseEvent* event) override;
+	void startDrag(Qt::DropActions supportedActions) override;
+	void dropEvent(QDropEvent* event) override;
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dragMoveEvent(QDragMoveEvent* event) override;
 };
 
 //Overwritten QTreeWidget for mouse event
@@ -36,6 +45,10 @@ signals:
 public:
 	TreeWidget(QWidget* parent = nullptr);
 	void mousePressEvent(QMouseEvent* event) override;
+	void startDrag(Qt::DropActions supportedActions) override;
+	void dropEvent(QDropEvent* event) override;
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dragMoveEvent(QDragMoveEvent* event) override;
 };
 
 class TreeViewWidget : public QWidget {
@@ -92,9 +105,10 @@ private:
 
 	bool m_isConnected = false;
 
-	ThreadPool m_threadPool;
+	//ThreadPool m_threadPool;
 
 	TransferManager m_manager;
+	QMutex m_mutex;
 };
 
 #endif // SFTP_CLIENT_MAINGUI_H

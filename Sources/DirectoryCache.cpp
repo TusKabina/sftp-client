@@ -73,7 +73,7 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     CURLcode res = curl_easy_perform(m_curlHandle.get());
 
     if (res != CURLE_OK) {
-        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
         m_curlCode = static_cast<int>(res);
         return entries;
     }

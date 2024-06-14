@@ -41,7 +41,7 @@ add_executable(SftpClient main.cpp
         Sources/TransferManager.cpp
         Sources/DirectoryCache.cpp
         Sources/TransferHandle.cpp 
-)
+ )
 
 # Link the Qt5 Widgets library
 target_link_libraries(SftpClient Qt5::Widgets)

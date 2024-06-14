@@ -1,12 +1,13 @@
 #include "TransferJob.h"
 #include <iostream>
-
+#include <thread>
 size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, TransferFile* transferFile) {
     if (transferFile->m_stream) {
         size_t totalSize = size * nmemb;
         size_t bytesWritten = fwrite(buffer, 1, totalSize, transferFile->m_stream);
         transferFile->m_totalBytes = totalSize;
         transferFile->m_bytesTransfered += bytesWritten;
+        std::cout << "TRANSFERANOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: " << transferFile->m_bytesTransfered << std::endl;
         return bytesWritten;
     } else {
         return 0;
@@ -28,8 +29,9 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, Transf
     return 0;
 }
 
-void TransferJob::downloadFile(const std::string& url) {
+void TransferJob::downloadFile() {
     if (m_transferHandle.m_curlHandle.get()) {
+
         m_transferFile.m_stream = fopen(m_transferFile.m_localPath.c_str(), "wb");
         if (!m_transferFile.m_stream) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
@@ -37,17 +39,31 @@ void TransferJob::downloadFile(const std::string& url) {
             return;
         }
 
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (url + m_transferFile.m_remotePath).c_str());
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + m_transferFile.m_remotePath).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, &m_transferFile);
 
+        std::cout << "---------------------------------UNUTAR DOWNLOAD---------------------------------------------------" << std::endl;
+        std::cout << "REMOTEPATH: " << m_transferFile.m_remotePath << std::endl;
+        std::cout << "LOCALPATH: " << m_transferFile.m_localPath << std::endl;
+        std::cout << "JOBID " << m_jobId << std::endl;
+        std::cout << "---------------------------------UNUTAR DOWNLOAD---------------------------------------------------" << std::endl;
+
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
+        std::thread::id this_id = std::this_thread::get_id();
+        std::cout << "THREAD ID " << this_id << "OVO JE THREAD ID!!!!!!!!!!!!!!!!!!!!!!!\n";
+        std::cout << "CURL ADDRESS: " << (m_transferHandle.m_curlHandle.get()) << std::endl;
+        std::cout << "---------------------------------NAKON PERFORME---------------------------------------------------" << std::endl;
+        std::cout << "REMOTEPATH: " << m_transferFile.m_remotePath << std::endl;
+        std::cout << "LOCALPATH: " << m_transferFile.m_localPath << std::endl;
+        std::cout << "JOBID " << m_jobId << std::endl;
+        std::cout << "---------------------------------NAKON PERFORME---------------------------------------------------" << std::endl;
 
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " LocalPath: " + m_transferFile.m_localPath;
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
@@ -140,13 +156,13 @@ void TransferJob::deleteFile(const std::string& url) {
     }
 }
 
-uint64_t TransferJob::createJob(TransferHandle& transferHandle, const std::string& localPath, const std::string& remotePath) {
-    m_transferHandle  = transferHandle;
+uint64_t TransferJob::createJob(const std::string localPath, const std::string remotePath, const std::string url) {
     m_transferFile.m_localPath = localPath;
     m_transferFile.m_localDirectoryPath = m_transferFile.m_localPath.substr(0, m_transferFile.m_localPath.find_last_of('/'));
     m_transferFile.m_remotePath = remotePath;
     m_transferFile.m_remoteDirectoryPath = m_transferFile.m_remotePath.substr(0, m_transferFile.m_remotePath.find_last_of('/'));
     m_jobId = UIDGenerator::getInstance().generateID();
+    m_url = url;
     return m_jobId;
 }
 
