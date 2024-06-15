@@ -66,6 +66,7 @@ public:
 	TreeViewWidget();
 	void populateTreeView();
 	void updateTreeView(const std::string& path);
+	TransferManager& getTransferManager() { return m_manager; }
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
 

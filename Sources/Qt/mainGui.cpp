@@ -57,25 +57,33 @@ void TreeView::dropEvent(QDropEvent* event) {
 
 		QString localPath = ((QFileSystemModel*)model())->filePath(droppedIndex);
 		std::filesystem::path p = localPath.toStdString();
+
+		std::string fileName = FileName(dataAsString.toStdString());
+		localPath = localPath + "/" + fileName.c_str();
+		std::string testRemote = "/" + dataAsString.toStdString();
+		std::string testLocal = localPath.toStdString();
+
 		if (!std::filesystem::is_regular_file(p)) {
-			//do nthing
+			//testLocal = GetDirectoryName(testLocal);
 		}
 		else {
 			return;
 		}
 
-		std::string fileName = FileName(dataAsString.toStdString());
-		localPath = localPath + "/" + fileName.c_str();
-		std::string testRemote = dataAsString.toStdString();
-		std::string testLocal = localPath.toStdString();
-		int test = 666;
+		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
+		if (parentWidget) {
+			TransferManager& transferManager = parentWidget->getTransferManager();
+			uint64_t downloadJobId = transferManager.prepareJob(testLocal, testRemote);
+			transferManager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
 
+		}
+	
 	}
 
 	event->accept();
 }
 
-TreeWidget::TreeWidget(QWidget* parent) : QTreeWidget(parent) {
+TreeWidget::TreeWidget(QWidget* parent) : QTreeWidget(parent){
 }
 
 void TreeWidget::mousePressEvent(QMouseEvent* event) {
@@ -89,7 +97,6 @@ void TreeWidget::mousePressEvent(QMouseEvent* event) {
 
 void TreeWidget::startDrag(Qt::DropActions supportedActions) {
 	auto mimeData = new QMimeData();
-
 	QTreeWidgetItem* item = itemFromIndex(currentIndex());
 
 	QString data = item->text(0);
@@ -137,7 +144,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 		QTreeWidgetItem* item = itemFromIndex(droppedIndex);
 
 		QString remotePath = item->text(0);
-
+		
 		while (item->parent() != NULL) {
 			remotePath = item->parent()->text(0) + "/" + remotePath;
 			item = item->parent();
@@ -150,6 +157,15 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 
 		std::string testRemote = remotePath.toStdString();
 		std::string testLocal = dataAsString.toStdString();
+
+		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
+		if (parentWidget) {
+			TransferManager& transferManager = parentWidget->getTransferManager();
+			uint64_t uploadJobId = transferManager.prepareJob(testLocal, testRemote);
+			transferManager.submitJob(uploadJobId, JobOperation::UPLOAD);
+
+		}
+		
 		int test = 666;
 	}
 
