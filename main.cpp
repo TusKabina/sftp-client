@@ -8,7 +8,7 @@ void handleButton() {
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
-
+    qRegisterMetaType<TransferStatus>("TransferStatus");
     TreeViewWidget w;
     w.showMaximized();
     /*QPushButton button("Click Me!");
