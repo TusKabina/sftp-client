@@ -130,9 +130,9 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         }
 
         std::istringstream lineStream(line);
-        std::string permissions, hardLinks, owner, group, strSize, month, day, dateTime, name;
+        std::string permissions, hardLinks, owner, group, strSize, month, day, timeOrYear, name;
 
-        lineStream >> permissions >> hardLinks >> owner >> group >> strSize >> month >> day >> dateTime;
+        lineStream >> permissions >> hardLinks >> owner >> group >> strSize >> month >> day >> timeOrYear;
         std::getline(lineStream, name);
 
         name = name.substr(name.find_first_not_of(' '));
@@ -143,7 +143,7 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         entry.m_isFile = permissions[0] == '-' ? true : false;
         entry.m_totalBytes = std::stoul(strSize);
         entry.m_name = name;
-        entry.m_lastModified = dateTime;
+        entry.m_lastModified = month + " " + day + " " + timeOrYear;
 
         entries.push_back(entry);
     }

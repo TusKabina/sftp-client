@@ -4,7 +4,7 @@
 #include <vector>
 #include <filesystem>
 #include <QHeaderView>
-
+#include <qdatetime.h>
 std::string GetDirectoryName(const std::string& name) {
 	size_t pos = name.find_last_of("\\/");
 	return (std::string::npos == pos) ? "" : name.substr(0, pos);
@@ -12,6 +12,46 @@ std::string GetDirectoryName(const std::string& name) {
 
 std::string FileName(const std::string& path) {
 	return path.substr(path.find_last_of("/\\") + 1);
+}
+
+QString humanReadableSize(qint64 size) {
+	QStringList units = { "B", "KB", "MB", "GB", "TB" };
+	int unitIndex = 0;
+	double sizeInUnits = size;
+
+	while (sizeInUnits > 1024.0 && unitIndex < units.size() - 1) {
+		sizeInUnits /= 1024.0;
+		unitIndex++;
+	}
+
+	return QString::number(sizeInUnits, 'f', 2) + " " + units[unitIndex];
+}
+
+QDateTime parseDateString(const std::string& dateString) {
+	QStringList dateParts = QString::fromStdString(dateString).split(' ');
+
+	if (dateParts.size() != 3) {
+		return QDateTime();
+	}
+
+	QString month = dateParts[0];
+	QString day = dateParts[1];
+	QString timeOrYear = dateParts[2];
+
+	QString dateTimeStr;
+	auto currentYear = QDate::currentDate().year();
+
+	// curl (ls -ll command) can return date without year if the entry is not older than 6 months
+	if (timeOrYear.contains(':')) {
+		dateTimeStr = month + " " + day + " " + timeOrYear + " " + QString::number(currentYear);
+	}
+	else {
+		dateTimeStr = month + " " + day + " 00:00 " + timeOrYear;
+	}
+
+	QDateTime dateTime = QDateTime::fromString(dateTimeStr, "MMM dd HH:mm yyyy");
+
+	return dateTime;
 }
 
 void TreeView::mousePressEvent(QMouseEvent* event) {
@@ -362,9 +402,12 @@ TreeViewWidget::TreeViewWidget() {
 	connect(m_treeWidget, SIGNAL(RightClickAction(QMouseEvent*)),
 		this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
 	m_treeWidget->setEnabled(true);
-	m_treeWidget->setColumnCount(1);
-	m_treeWidget->setHeaderHidden(true);
-	m_treeWidget->setHeaderLabels(QStringList() << tr("Name"));
+	m_treeWidget->setColumnCount(4);
+	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified" });
+	m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_treeWidget->setSortingEnabled(true);
+	//m_treeWidget->setHeaderHidden(true);
+	//m_treeWidget->setHeaderLabels(QStringList() << tr("Name"));
 	
 	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
 		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
@@ -458,7 +501,15 @@ void TreeViewWidget::populateTreeView() {
 			if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 				continue;
 			}
+			QDateTime dateTime = parseDateString(entry.m_lastModified);
+			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
+			
 			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+			item->setText(0, QString::fromStdString(entry.m_name));
+			item->setText(1, humanReadableSize(entry.m_totalBytes));
+			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+			item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
+
 			if (entry.m_isDirectory) {
 				item->setIcon(0, QPixmap("dir.png"));
 				item->setData(0, Qt::UserRole, true);
@@ -482,7 +533,14 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 			continue;
 		}
+		std::string lastMod = entry.m_lastModified;
+		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+		item->setText(0, QString::fromStdString(entry.m_name));
+		item->setText(1, humanReadableSize(entry.m_totalBytes));
+		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+		item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
 		if (entry.m_isDirectory) {
 			item->setIcon(0, QPixmap("dir.png"));
 			item->setData(0, Qt::UserRole, true);

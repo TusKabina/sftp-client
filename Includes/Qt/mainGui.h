@@ -37,7 +37,6 @@ public:
 	void dragMoveEvent(QDragMoveEvent* event) override;
 };
 
-//Overwritten QTreeWidget for mouse event
 class TreeWidget : public QTreeWidget {
 	Q_OBJECT
 signals:
@@ -105,8 +104,6 @@ private:
 	QTextEdit m_textDebugLog;
 
 	bool m_isConnected = false;
-
-	//ThreadPool m_threadPool;
 
 	TransferManager m_manager;
 	QMutex m_mutex;

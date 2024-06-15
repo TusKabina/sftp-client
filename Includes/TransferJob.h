@@ -46,7 +46,6 @@ public:
     void closeStreamFile();
 
     uint64_t createJob(const std::string localPath, const std::string remotePath, const std::string url);
-    //void setHandle(TransferHandle& transferHandle) { m_transferHandle = transferHandle; }
 
     ~TransferJob();
 
