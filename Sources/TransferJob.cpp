@@ -1,13 +1,14 @@
 #include "TransferJob.h"
 #include <iostream>
 #include <thread>
-size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, TransferFile* transferFile) {
-    if (transferFile->m_stream) {
+size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
+    TransferJob* job = static_cast<TransferJob*>(parent);
+    if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
-        size_t bytesWritten = fwrite(buffer, 1, totalSize, transferFile->m_stream);
-        transferFile->m_totalBytes = totalSize;
-        transferFile->m_bytesTransfered += bytesWritten;
-        std::cout << "TRANSFERANOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: " << transferFile->m_bytesTransfered << std::endl;
+        size_t bytesWritten = fwrite(buffer, 1, totalSize, job->m_transferFile.m_stream);
+        job->m_transferFile.m_totalBytes = totalSize;
+        job->m_transferFile.m_bytesTransfered += bytesWritten;
+        job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
         return bytesWritten;
     } else {
         return 0;
@@ -41,7 +42,7 @@ void TransferJob::downloadFile() {
 
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + m_transferFile.m_remotePath).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, &m_transferFile);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
 
         std::cout << "---------------------------------UNUTAR DOWNLOAD---------------------------------------------------" << std::endl;
         std::cout << "REMOTEPATH: " << m_transferFile.m_remotePath << std::endl;

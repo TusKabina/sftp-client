@@ -7,7 +7,12 @@
 #include <vector>
 #include <iostream>
 #include <utility>
-class TransferJob {
+#include <qobject.h>
+
+class TransferJob : public QObject{
+    Q_OBJECT
+signals:
+    void onTransferStatusUpdated(TransferStatus status);
 private:
     TransferHandle m_transferHandle;
     TransferFile m_transferFile;
@@ -23,41 +28,6 @@ public:
         m_jobId = UIDGenerator::getInstance().generateID();
         m_url = url;
     }
-    /*TransferJob(TransferJob&& other) {
-        m_transferHandle = other.m_transferHandle;
-        m_transferFile.m_bytesTransfered = std::exchange(other.m_transferFile.m_bytesTransfered, 0);
-        m_transferFile.m_totalBytes = std::exchange(other.m_transferFile.m_totalBytes, 0);
-        m_transferFile.m_localDirectoryPath = std::move(other.m_transferFile.m_localDirectoryPath);
-        m_transferFile.m_localPath = std::move(other.m_transferFile.m_localPath);
-        m_transferFile.m_remoteDirectoryPath = std::move(other.m_transferFile.m_remoteDirectoryPath);
-        m_transferFile.m_remotePath = std::move(other.m_transferFile.m_remotePath);
-        m_transferFile.m_stream = other.m_transferFile.m_stream;
-        other.m_transferFile.m_stream = nullptr;
-        m_url = std::move(other.m_url);
-        m_jobId = std::exchange(other.m_jobId, 0);
-    }
-
-    TransferJob& operator=(TransferJob&& other) {
-        if (this != &other) {
-            m_transferHandle = other.m_transferHandle;
-            m_transferFile.m_bytesTransfered = std::exchange(other.m_transferFile.m_bytesTransfered, 0);
-            m_transferFile.m_totalBytes = std::exchange(other.m_transferFile.m_totalBytes, 0);
-            m_transferFile.m_localDirectoryPath = std::move(other.m_transferFile.m_localDirectoryPath);
-            m_transferFile.m_localPath = std::move(other.m_transferFile.m_localPath);
-            m_transferFile.m_remoteDirectoryPath = std::move(other.m_transferFile.m_remoteDirectoryPath);
-            m_transferFile.m_remotePath = std::move(other.m_transferFile.m_remotePath);
-
-            if (m_transferFile.m_stream) {
-                std::fclose(m_transferFile.m_stream);
-            }
-            m_transferFile.m_stream = other.m_transferFile.m_stream;
-            other.m_transferFile.m_stream = nullptr;
-            m_url = std::move(other.m_url);
-            m_jobId = std::exchange(other.m_jobId, 0);
-        }
-        return *this;
-    }*/
-    
 
     [[nodiscard]] const TransferStatus& getTransferStatus() const {return m_transferHandle.m_transferStatus;}
     [[nodiscard]] const std::string& getLocalDirectoryPath() const { return m_transferFile.m_localDirectoryPath; }
@@ -81,7 +51,7 @@ public:
     ~TransferJob();
 
 private:
-    static size_t WriteCallback(void* buffer, size_t size, size_t nmemb, TransferFile* transferFile);
+    static size_t WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent);
     static size_t dummyWriteCallback(void* ptr, size_t size, size_t nmemb, void* stream);
     static size_t ReadCallback(void *buffer, size_t size, size_t nmemb, TransferFile* transferFile);
 
