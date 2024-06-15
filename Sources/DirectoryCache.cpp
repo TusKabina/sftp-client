@@ -81,6 +81,21 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     return entries;
 }
 
+bool DirectoryCache::isFile(const std::string& path) {
+    size_t pos = path.find_last_of("/");
+    std::string directoryPath = path.substr(0, pos);
+    std::string fileName = path.substr(pos + 1, path.size());
+    if (isPathInCache(directoryPath)) {
+        return false;
+    }
+    const auto& entries = m_cache.at(directoryPath);
+    auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
+        return entry.m_name == fileName; });
+
+    
+    return it != entries.end() && it->m_isFile;
+}
+
 bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const {
     auto it = m_cache.find(path);
     if (it != m_cache.end()) {
@@ -115,9 +130,9 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         }
 
         std::istringstream lineStream(line);
-        std::string permissions, hardLinks, owner, group, sizeStr, month, day, timeOrYear, name;
+        std::string permissions, hardLinks, owner, group, strSize, month, day, dateTime, name;
 
-        lineStream >> permissions >> hardLinks >> owner >> group >> sizeStr >> month >> day >> timeOrYear;
+        lineStream >> permissions >> hardLinks >> owner >> group >> strSize >> month >> day >> dateTime;
         std::getline(lineStream, name);
 
         name = name.substr(name.find_first_not_of(' '));
@@ -125,8 +140,10 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         DirectoryEntry entry;
         entry.m_isDirectory = permissions[0] == 'd' ? true : false;
         entry.m_isSymLink = permissions[0] == 'l' ? true : false;
-        entry.m_totalBytes = std::stoul(sizeStr);
+        entry.m_isFile = permissions[0] == '-' ? true : false;
+        entry.m_totalBytes = std::stoul(strSize);
         entry.m_name = name;
+        entry.m_lastModified = dateTime;
 
         entries.push_back(entry);
     }

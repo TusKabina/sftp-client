@@ -7,10 +7,12 @@
 #include <map>
 struct DirectoryEntry {
     std::string m_name;
+    std::string m_lastModified;
     uint64_t m_totalBytes;
     bool m_forbidden = false;
     bool m_isDirectory = false;
     bool m_isSymLink = false;
+    bool m_isFile = false;
 };
 
 class DirectoryCache {
@@ -27,6 +29,7 @@ public:
     [[nodiscard]] bool initialize(const std::string& url, const std::string& user, std::string& password);
     [[nodiscard]] bool isPathInCache(const std::string& path) const { return m_cache.find(path) != m_cache.end(); }
     [[nodiscard]] bool isInitialized() { return m_initialized; }
+    [[nodiscard]] bool isFile(const std::string& path);
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_cache; }
     bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const;
     bool isRegularFile(const std::string& filePath);
