@@ -18,7 +18,7 @@ class JobRunnable;
 class CurlThreadPool : public QThreadPool {
 public:
     CurlThreadPool() : QThreadPool() {
-        setMaxThreadCount(3);
+        setMaxThreadCount(20);
         
     }
 
@@ -85,6 +85,9 @@ public:
     void submitJob(uint64_t jobId, JobOperation jobType);
 
     ~TransferManager();
+
+public slots:
+    void onTransferStatusReceived(TransferStatus status);
 };
 
 class JobRunnable : public QRunnable {

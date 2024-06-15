@@ -7,31 +7,14 @@ void TransferManager::setCredentials(const std::string& host, const std::string&
     m_password = password;
 }
 
-//TransferManager::TransferManager(const std::string& host, const std::string& username, std::string& password) {
-//    //TODO: Number of transfer handles will depend on the number of threads that will be used. 10 is placeholder for now
-//    curl_global_init(CURL_GLOBAL_DEFAULT);
-//
-//    if (!m_DirectoryCache.initialize(host, username, password)) {
-//        m_initialized = false;
-//        return;
-//    }
-//    setCredentials(host,username,password);
-//    m_maxHandlesNumber = 10;
-//    for(int id = 0; id < m_maxHandlesNumber; id++) {
-//        std::shared_ptr<CURL> curlHandle(curl_easy_init(), curl_easy_cleanup);
-//        m_transferHandles.emplace_back(std::move(curlHandle));
-//    }
-//
-//    m_DirectoryCache.prefetchDirectories("/", 3);
-//    m_initialized = true;
-//}
-
 uint64_t TransferManager::prepareJob(const std::string localPath, const std::string remotePath) {
     QMutexLocker locker(&m_mutex);
-    //TransferJob job;
-   // job.createJob(localPath,remotePath, m_url);
-    m_transferJobs.push_back(new TransferJob(localPath,remotePath,m_url));
-    m_handleCounter.fetch_add(1);
+    TransferJob* job = new TransferJob(localPath, remotePath, m_url);
+    m_transferJobs.push_back(job);
+
+    QObject::connect(job, SIGNAL(onTransferStatusUpdated(TransferStatus)),
+        this, SLOT(onTransferStatusReceived(TransferStatus)));
+
     return m_transferJobs.back()->getJobId();
 }
 
@@ -45,7 +28,6 @@ void TransferManager::connect(const std::string& host, const std::string& userna
     setCredentials(host, username, password);
 
     m_DirectoryCache.prefetchDirectories("/", 3);
-   // m_threadPool.setMaxThreadCount(10);
     m_initialized = true;
 }
 
@@ -55,7 +37,6 @@ TransferManager::~TransferManager() {
 }
 
 void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std::shared_ptr<CURL> curl) {
-
    const auto job = std::find_if(m_transferJobs.begin(), m_transferJobs.end(),[&jobId](const TransferJob* transferJob) {
         return transferJob->getJobId() == jobId;
     });
@@ -66,14 +47,6 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
    }
     std::string localDirPath = (*job)->getLocalDirectoryPath();
     (*job)->setTransferHandle(curl);
-
-    std::cout << "---------------------------------UNUTAR EXECUTE---------------------------------------------------" << std::endl;
-    std::cout << "JOB: " << std::endl;
-    std::cout << "JOBID: " << m_transferJobs.at(0)->getJobId() << std::endl;
-    std::cout << "LOCALPATH: " << m_transferJobs.at(0)->getLocalPath() << std::endl;
-    std::cout << "REMOTEPATH: " << m_transferJobs.at(0)->getRemotePath() << std::endl;
-    std::cout << "---------------------------------UNUTAR EXECUTE---------------------------------------------------" << std::endl;
-
 
     if(job != m_transferJobs.end()) {
         
@@ -100,13 +73,6 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 break;
         }
     }
-    std::cout << "---------------------------------UNUTAR EXECUTE---------------------------------------------------" << std::endl;
-    std::cout << "JOB: " << std::endl;
-    std::cout << "JOBID: " << m_transferJobs.at(0)->getJobId() << std::endl;
-    std::cout << "LOCALPATH: " << m_transferJobs.at(0)->getLocalPath() << std::endl;
-    std::cout << "REMOTEPATH: " << m_transferJobs.at(0)->getRemotePath() << std::endl;
-    std::cout << "---------------------------------UNUTAR EXECUTE---------------------------------------------------" << std::endl;
-
 }
 
 void TransferManager::submitJob(uint64_t jobId, JobOperation jobType) {
@@ -156,4 +122,8 @@ void TransferManager::deleteJob(uint64_t jobId) {
             ++it;
         }
     }
+}
+
+void TransferManager::onTransferStatusReceived(TransferStatus status) {
+    //std::cout << "-------------------------------------------------------------TRANSFER RECEIVED-------------------------------------------------------------" << std::endl;
 }
