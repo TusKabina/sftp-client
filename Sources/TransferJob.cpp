@@ -1,6 +1,8 @@
 #include "TransferJob.h"
 #include <iostream>
 #include <thread>
+#include <cstdio>
+
 size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
     TransferJob* job = static_cast<TransferJob*>(parent);
     if (job->m_transferFile.m_stream) {
@@ -70,6 +72,7 @@ void TransferJob::downloadFile() {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
         }
         closeStreamFile();
+        curl_easy_reset(m_transferHandle.m_curlHandle.get());
     }
 }
 void TransferJob::uploadFile(const std::string& url) {
@@ -88,19 +91,22 @@ void TransferJob::uploadFile(const std::string& url) {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READDATA, &m_transferFile);
 
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
+        std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << "\n";
+        std::cout << "[UPLOAD] REMOTE PATH: " << m_transferFile.m_remotePath << "\n";
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
 
         if (res != CURLE_OK) {
             
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << m_transferHandle.m_transferStatus.m_errorMessage << "\n";
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
         }
         //TODO: make custom deleter for CURL shared_ptr where on each decrement curl_easy_reset will be called
-        curl_easy_reset(m_transferHandle.m_curlHandle.get());
         closeStreamFile();
+        curl_easy_reset(m_transferHandle.m_curlHandle.get());
     }
 }
 
@@ -131,6 +137,7 @@ void TransferJob::moveFile(const std::string& url) {
         }
         curl_slist_free_all(header);
     }
+    curl_easy_reset(m_transferHandle.m_curlHandle.get());
 }
 
 void TransferJob::deleteFile(const std::string& url) {
@@ -144,6 +151,7 @@ void TransferJob::deleteFile(const std::string& url) {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_QUOTE, header);
 
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
+        std::cout << "[DELETE] JOBID: " << m_jobId << " starting curl_easy_perform: " << "\n";
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
 
         if (res != CURLE_OK) {
@@ -154,6 +162,16 @@ void TransferJob::deleteFile(const std::string& url) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
         }
         curl_slist_free_all(header);
+    }
+    curl_easy_reset(m_transferHandle.m_curlHandle.get());
+}
+
+void TransferJob::deleteLocalFile(const std::string& path) {
+    if (std::remove(path.c_str()) == 0) {
+        std::cout << "File successfully deleted\n";
+    }
+    else {
+        std::perror("Error deleting file");
     }
 }
 

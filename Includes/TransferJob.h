@@ -8,6 +8,7 @@
 #include <iostream>
 #include <utility>
 #include <qobject.h>
+#include <cstdio>
 
 class TransferJob : public QObject{
     Q_OBJECT
@@ -60,6 +61,7 @@ public:
     void copyFile(const std::string& url);
     void moveFile(const std::string& url);
     void deleteFile(const std::string& url);
+    void deleteLocalFile(const std::string& path);
 };
 
 #endif //SFTP_INTERFACE_TRANSFERJOB_H

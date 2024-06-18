@@ -49,7 +49,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
     (*job)->setTransferHandle(curl);
 
     if(job != m_transferJobs.end()) {
-        
+        std::string remotePath = (*job)->getRemoteDirectoryPath() + "/";
         switch (jobType) {
             case JobOperation::DOWNLOAD:
                 (*job)->downloadFile();
@@ -57,26 +57,34 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 break;
             case JobOperation::UPLOAD:
                 (*job)->uploadFile(m_url);
-                m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
+                {
+                    QMutexLocker locker(&m_mutex);
+                    m_DirectoryCache.refreshDirectory(remotePath);
+                }
                 break;
             case JobOperation::COPY:
                 (*job)->copyFile(m_url);
                 break;
             case JobOperation::MOVE:
+               // m_DirectoryCache.refreshDirectory((*job)->getLocalDirectoryPath() + "/");
+               // m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
                 (*job)->moveFile(m_url);
-                m_DirectoryCache.refreshDirectory((*job)->getLocalDirectoryPath() + "/");
-                m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
                 break;
             case JobOperation::DELETE:
                 (*job)->deleteFile(m_url);
-                m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
+                {
+                    QMutexLocker locker(&m_mutex);
+                    m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
+                }
                 break;
+            case JobOperation::DELETE_LOCAL:
+                (*job)->deleteLocalFile((*job)->getLocalPath());
+
         }
     }
 }
 
 void TransferManager::submitJob(uint64_t jobId, JobOperation jobType) {
-    std::cout << "SUBMIT JOB JOB_ID: " << jobId << std::endl;
     auto runnable = new JobRunnable(this, jobId, jobType, &m_threadPool);
     runnable->setAutoDelete(false);
     m_threadPool.start(runnable);

@@ -64,7 +64,10 @@ public slots:
 public:
 	TreeViewWidget();
 	void populateTreeView();
+	void refreshTreeViewRoot(const std::string& path);
 	void updateTreeView(const std::string& path);
+
+	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);

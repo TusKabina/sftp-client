@@ -39,7 +39,8 @@ enum class JobOperation {
     DOWNLOAD,
     COPY,
     MOVE,
-    DELETE
+    DELETE,
+    DELETE_LOCAL
 
 };
 
@@ -108,6 +109,7 @@ public:
             std::cout << "COUNT IN RUN: " << curl.use_count() << std::endl;
             m_transferManager->executeJob(m_jobId, m_jobType, curl);
             std::cout << "COUNT AFTER EXECUTE JOB: " << curl.use_count() << std::endl;
+            m_transferManager->deleteJob(m_jobId);
 
         }
     }

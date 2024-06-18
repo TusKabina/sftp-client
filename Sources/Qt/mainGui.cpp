@@ -2,9 +2,10 @@
 
 #include <iostream> // TODO: DELETE
 #include <vector>
-#include <filesystem>
+
 #include <QHeaderView>
 #include <qdatetime.h>
+#include <filesystem>
 std::string GetDirectoryName(const std::string& name) {
 	size_t pos = name.find_last_of("\\/");
 	return (std::string::npos == pos) ? "" : name.substr(0, pos);
@@ -14,7 +15,7 @@ std::string FileName(const std::string& path) {
 	return path.substr(path.find_last_of("/\\") + 1);
 }
 
-QString humanReadableSize(qint64 size) {
+QString convertSize(qint64 size) {
 	QStringList units = { "B", "KB", "MB", "GB", "TB" };
 	int unitIndex = 0;
 	double sizeInUnits = size;
@@ -101,18 +102,20 @@ void TreeView::dropEvent(QDropEvent* event) {
 		std::string fileName = FileName(dataAsString.toStdString());
 		localPath = localPath + "/" + fileName.c_str();
 		std::string testRemote = "/" + dataAsString.toStdString();
-		std::string testLocal = localPath.toStdString();
+		std::string directoryPath;
 
-		if (!std::filesystem::is_regular_file(p)) {
-			//testLocal = GetDirectoryName(testLocal);
+		if (!std::filesystem::is_directory(p)) {
+			directoryPath = GetDirectoryName(p.string());
+			localPath = QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
 		}
-		else {
-			return;
-		}
+		std::string testLocal = localPath.toStdString();
 
 		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
 		if (parentWidget) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
+			parentWidget->getDebugLog().append("Downloading: Source: " + QString::fromStdString(testLocal) + 
+				"Destination: " + QString::fromStdString(testRemote));
+
 			uint64_t downloadJobId = transferManager.prepareJob(testLocal, testRemote);
 			transferManager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
 
@@ -173,6 +176,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 		}
 		else {
 			//not file
+			//parentWidget->getDebugLog().append("Error: \nSource: " + QString::fromStdString(testLocal) + " is a directory!");
 			return;
 		}
 
@@ -191,17 +195,25 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 		}
 
 		//check if remote path is file or directory
-		std::string fileName = FileName(dataAsString.toStdString());
 
-		remotePath = remotePath + "/" + fileName.c_str();
 
 		std::string testRemote = remotePath.toStdString();
 		std::string testLocal = dataAsString.toStdString();
+		std::string fileName = FileName(dataAsString.toStdString());
 
 		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
 		if (parentWidget) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
-			uint64_t uploadJobId = transferManager.prepareJob(testLocal, testRemote);
+			if(transferManager.isRegularFile("/" + remotePath.toStdString())) {
+				std::string directoryPath = GetDirectoryName("/" + remotePath.toStdString());
+				remotePath = "/" + QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
+			}
+			else {
+				remotePath = "/" + remotePath + "/" + fileName.c_str();
+			}
+			parentWidget->getDebugLog().append("Uploading: \nSource: " + QString::fromStdString(testLocal) + " Destination: " + remotePath);
+
+			uint64_t uploadJobId = transferManager.prepareJob(testLocal, remotePath.toStdString());
 			transferManager.submitJob(uploadJobId, JobOperation::UPLOAD);
 
 		}
@@ -238,7 +250,7 @@ void TreeViewWidget::eventFromThreadPoolReceived(int id) {
 
 void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path)
 {
-	//updateTreeView(path);
+	refreshTreeViewRoot(path);
 }
 
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
@@ -287,6 +299,7 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pUpload = menu.addAction(trUtf8("Upload"));
+	QAction* pDelete = menu.addAction(trUtf8("Delete"));
 	std::string fullPath;
 	
 	QAction* pSelected = menu.exec(m_treeView->mapToGlobal(event->pos()));
@@ -299,13 +312,20 @@ void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 		if (std::filesystem::is_regular_file(p)) {
 			m_textDebugLog.append("Uploading: " + m_textCommandParameterLocal);
 			m_textDebugLog.append("Remote directory: " + m_directoryNameRemote);
-
-			/*auto func = [=]() {
-				std::thread::id this_id = std::this_thread::get_id();
-				std::cout << "thread " << this_id << " func...\n";
-			};*/
-
-			//m_threadPool.queueJob(func);
+		}
+		else {
+			m_textDebugLog.append("ERROR: not file -->" + m_textCommandParameterLocal);
+			m_textDebugLog.append("Remote directory: " + m_directoryNameRemote);
+		}
+	}
+	else if (pSelected == pDelete) {
+		std::filesystem::path p = m_textCommandParameterLocal.toStdString();
+		if (std::filesystem::is_regular_file(p)) {
+			m_textDebugLog.append("Deleting: " + m_textCommandParameterLocal);
+			m_textDebugLog.append("Remote directory: " + m_directoryNameRemote);
+			std::string localPath = p.string();
+			uint64_t deleteJobId = m_manager.prepareJob(localPath, "");
+			m_manager.submitJob(deleteJobId, JobOperation::DELETE_LOCAL);
 		}
 		else {
 			m_textDebugLog.append("ERROR: not file -->" + m_textCommandParameterLocal);
@@ -360,6 +380,21 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 		}
 	}
 	else if (pSelected == Pdelete) {
+		std::string strPath = m_textCommandParameterRemote.toStdString();
+		if (strPath.front() != '/') {
+			strPath = "/" + strPath;
+			if (m_manager.isRegularFile(strPath)) {
+				std::string remotePath = "/" + m_textCommandParameterRemote.toStdString();
+				size_t pos = remotePath.find_last_of("/");
+				m_textDebugLog.append("Deleting: /" + m_textCommandParameterRemote);
+				uint64_t deleteJobId = m_manager.prepareJob("", remotePath);
+				m_manager.submitJob(deleteJobId, JobOperation::DELETE);
+			}
+		}
+		else {
+			m_textDebugLog.append("ERROR: not file -->" + m_textCommandParameterRemote);
+			m_textDebugLog.append("Local directory: " + m_textCommandParameterRemote);
+		}
 		//TODO
 	}
 }
@@ -412,7 +447,10 @@ TreeViewWidget::TreeViewWidget() {
 	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
 		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
 
-	
+	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
+	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
+		this->onDirectoryCacheUpdated(path);
+		});
 
 	//Basic layout for widgets
 	QHBoxLayout* horizontalLayoutUserCredentials = new QHBoxLayout;
@@ -506,7 +544,7 @@ void TreeViewWidget::populateTreeView() {
 			
 			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 			item->setText(0, QString::fromStdString(entry.m_name));
-			item->setText(1, humanReadableSize(entry.m_totalBytes));
+			item->setText(1, convertSize(entry.m_totalBytes));
 			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 			item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
 
@@ -523,6 +561,42 @@ void TreeViewWidget::populateTreeView() {
 	}
 }
 
+void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
+	QTreeWidgetItem* root = findOrCreateRoot(QString::fromStdString(path));
+	if (!root) {
+		return;
+	}
+	root->takeChildren();
+
+	const auto entries = m_manager.getDirectoryList(path);
+	for (const auto& entry : entries) {
+		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+			continue;
+		}
+
+		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
+
+		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
+		item->setText(0, QString::fromStdString(entry.m_name));
+		item->setText(1, convertSize(entry.m_totalBytes));
+		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+		item->setText(3, formattedDate);
+
+		if (entry.m_isDirectory) {
+			item->setIcon(0, QPixmap("dir.png"));
+			item->setData(0, Qt::UserRole, true);
+		}
+		else {
+			item->setIcon(0, QPixmap("file.png"));
+			item->setData(0, Qt::UserRole, false);
+		}
+
+		root->addChild(item);
+	}
+	root->setExpanded(true);
+}
+
 void TreeViewWidget::updateTreeView(const std::string& path) {
 	const auto entries = m_manager.getDirectoryList(path);
 	if (entries.empty()) {
@@ -533,12 +607,11 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 			continue;
 		}
-		std::string lastMod = entry.m_lastModified;
 		QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 		item->setText(0, QString::fromStdString(entry.m_name));
-		item->setText(1, humanReadableSize(entry.m_totalBytes));
+		item->setText(1, convertSize(entry.m_totalBytes));
 		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 		item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
 		if (entry.m_isDirectory) {

@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <qobject.h>
+#include <qmutex.h>
 struct DirectoryEntry {
     std::string m_name;
     std::string m_lastModified;
@@ -15,14 +17,18 @@ struct DirectoryEntry {
     bool m_isFile = false;
 };
 
-class DirectoryCache {
+class DirectoryCache : public QObject {
+    Q_OBJECT
+signals:
+    void onDirectoryUpdated(const std::string path);
 private:
     CurlUniquePtr m_curlHandle;
     int m_curlCode;
     std::string m_baseUrl;
     std::map<std::string, std::vector<DirectoryEntry>> m_cache;
     bool m_initialized;
-
+    QMutex m_mutex;
+    
 public:
     DirectoryCache() {}
 
@@ -31,7 +37,7 @@ public:
     [[nodiscard]] bool isInitialized() { return m_initialized; }
     [[nodiscard]] bool isFile(const std::string& path);
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_cache; }
-    bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const;
+    bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries);
     bool isRegularFile(const std::string& filePath);
 
     void prefetchDirectories(const std::string& path, int depth);

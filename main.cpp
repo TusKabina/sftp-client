@@ -9,6 +9,7 @@ void handleButton() {
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     qRegisterMetaType<TransferStatus>("TransferStatus");
+    qRegisterMetaType<std::string>("std::string");
     TreeViewWidget w;
     w.showMaximized();
     /*QPushButton button("Click Me!");

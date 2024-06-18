@@ -36,13 +36,15 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     if (depth == 0) {
         return;
     }
-
-    std::vector<DirectoryEntry> entries = listDirectory(path);
+    std::vector<DirectoryEntry> entries;
+    entries = listDirectory(path);
     if (entries.empty()) {
-        return;
+            return;
+    }
+    {
+       // QMutexLocker locker(&m_mutex);
     }
     m_cache[path] = entries;
-
     for (const auto& entry : entries) {
         if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
             std::string subPath;
@@ -56,10 +58,9 @@ void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
     prefetchDirectories(path, depth);
 }
 
-std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& path)
-{
+std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& path) {
+    //QMutexLocker locker(&m_mutex);
     std::vector<DirectoryEntry> entries;
-    
     if (!m_curlHandle.get()) {
         return entries;
     }
@@ -82,6 +83,7 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
 }
 
 bool DirectoryCache::isFile(const std::string& path) {
+    QMutexLocker locker(&m_mutex);
     size_t pos = path.find_last_of("/");
     std::string directoryPath = path.substr(0, pos);
     std::string fileName = path.substr(pos + 1, path.size());
@@ -96,7 +98,8 @@ bool DirectoryCache::isFile(const std::string& path) {
     return it != entries.end() && it->m_isFile;
 }
 
-bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries) const {
+bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries)  {
+    QMutexLocker locker(&m_mutex);
     auto it = m_cache.find(path);
     if (it != m_cache.end()) {
         entries = it->second;
@@ -106,13 +109,17 @@ bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<Dir
 }
 
 bool DirectoryCache::isRegularFile(const std::string& filePath) {
-
+    QMutexLocker locker(&m_mutex);
     return !isPathInCache(filePath + "/");
 }
 
 void DirectoryCache::refreshDirectory(const std::string& path) {
     std::vector<DirectoryEntry> entries = listDirectory(path);
-    m_cache[path] = entries;
+     m_cache[path] = entries;
+    {
+       // QMutexLocker locker(&m_mutex);
+    }
+    emit onDirectoryUpdated(path);
 }
 
 size_t DirectoryCache::writeCallback(void* buffer, size_t size, size_t nmemb, std::string& response) {
