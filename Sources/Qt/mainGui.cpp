@@ -101,7 +101,7 @@ void TreeView::dropEvent(QDropEvent* event) {
 
 		std::string fileName = FileName(dataAsString.toStdString());
 		localPath = localPath + "/" + fileName.c_str();
-		std::string testRemote = "/" + dataAsString.toStdString();
+		std::string remotePath = "/" + dataAsString.toStdString();
 		std::string directoryPath;
 
 		if (!std::filesystem::is_directory(p)) {
@@ -114,9 +114,9 @@ void TreeView::dropEvent(QDropEvent* event) {
 		if (parentWidget) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
 			parentWidget->getDebugLog().append("Downloading: Source: " + QString::fromStdString(testLocal) + 
-				"Destination: " + QString::fromStdString(testRemote));
+				"Destination: " + QString::fromStdString(remotePath));
 
-			uint64_t downloadJobId = transferManager.prepareJob(testLocal, testRemote);
+			uint64_t downloadJobId = transferManager.prepareJob(testLocal, remotePath);
 			transferManager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
 
 		}
@@ -234,12 +234,12 @@ void TreeViewWidget::onConnectButtonClicked() {
 
 	if (m_isConnected) {
 		m_textDebugLog.append("Connected");
-		m_connectDisconnectButton->setText("Disconnected");
+		m_connectDisconnectButton->setText("Disconnect");
 		populateTreeView();
 	}
 	else {
 		m_textDebugLog.append("Disconnected");
-		m_connectDisconnectButton->setText("Connected");
+		m_connectDisconnectButton->setText("Connect");
 	}
 }
 
@@ -251,6 +251,15 @@ void TreeViewWidget::eventFromThreadPoolReceived(int id) {
 void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path)
 {
 	refreshTreeViewRoot(path);
+}
+
+void TreeViewWidget::onRemoteFolderKeyPressed() {
+	std::string path = m_remoteFolderLineEdit->text().toStdString();
+	if (path.back() != '/') {
+		path = path + "/";
+	}
+	
+
 }
 
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {

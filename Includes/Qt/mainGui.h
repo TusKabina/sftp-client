@@ -61,11 +61,13 @@ public slots:
 	void processTreeWidgetItemClicked(QTreeWidgetItem* item, int index);
 	void eventFromThreadPoolReceived(int);
 	void onDirectoryCacheUpdated(const std::string& path);
+	void onRemoteFolderKeyPressed();
 public:
 	TreeViewWidget();
 	void populateTreeView();
 	void refreshTreeViewRoot(const std::string& path);
 	void updateTreeView(const std::string& path);
+	void insertTreeViewWidget();
 
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
