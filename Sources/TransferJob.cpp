@@ -10,6 +10,10 @@ size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void*
         size_t bytesWritten = fwrite(buffer, 1, totalSize, job->m_transferFile.m_stream);
         job->m_transferFile.m_totalBytes = totalSize;
         job->m_transferFile.m_bytesTransfered += bytesWritten;
+
+        job->m_transferHandle.m_transferStatus.m_totalBytes = job->m_transferFile.m_totalBytes;
+        job->m_transferHandle.m_transferStatus.m_bytesTransferred = job->m_transferFile.m_bytesTransfered;
+
         job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
         return bytesWritten;
     } else {

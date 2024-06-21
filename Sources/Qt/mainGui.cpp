@@ -262,6 +262,23 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 
 }
 
+void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatus) {
+	QTreeWidgetItem* item;
+	if (m_transferItems.contains(transferStatus.m_jobId)) {
+		item = m_transferItems[transferStatus.m_jobId];
+	}
+	else {
+		item = new QTreeWidgetItem(m_transferStatusWidget);
+		m_transferItems[transferStatus.m_jobId] = item;
+		m_transferStatusWidget->addTopLevelItem(item);
+	}
+	uint64_t progress = (transferStatus.m_bytesTransferred / transferStatus.m_totalBytes) * 100;
+	item->setText(0, QString::fromStdString(std::string("Source Path placeholder")));
+	item->setText(1, QString::fromStdString(std::string("Destination Path placeholder")));
+	item->setText(2, QString::fromStdString(std::string("Date placeholder")));
+	item->setText(3, QString::number(transferStatus.m_bytesTransferred) + "B");
+	item->setText(4, QString::number(12) + " MB/s");
+}
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_textCommandParameterLocal = ((QFileSystemModel*)m_treeView->model())->filePath(index);
@@ -524,6 +541,11 @@ TreeViewWidget::TreeViewWidget() {
 	verticalLayout->addLayout(horizontalLayoutTreeView);
 	verticalLayout->addWidget(&m_textDebugLog);
 
+	// Add transfer status widget
+	m_transferStatusWidget = new QTreeWidget(this);
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "Source Path" << "Destination Path" << "Date" << "Bytes transfered" << "Speed");
+	verticalLayout->addWidget(m_transferStatusWidget);
+	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
 	/*connect(&m_threadPool, SIGNAL(WorkDone(int)),
 		this, SLOT(eventFromThreadPoolReceived(int)));*/
 

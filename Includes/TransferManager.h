@@ -46,6 +46,8 @@ enum class JobOperation {
 
 class TransferManager : public QObject {
     Q_OBJECT
+signals:
+    void transferStatusUpdated(TransferStatus transferStatus);
 private:
     DirectoryCache m_DirectoryCache;
     std::vector<TransferHandle> m_transferHandles;

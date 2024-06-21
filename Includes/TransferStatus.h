@@ -18,6 +18,7 @@ struct TransferStatus {
     size_t m_totalBytes;
     std::string m_errorMessage;
     int m_curlResCode;
+    uint64_t m_jobId;
     TransferStatus();
 };
 inline std::ostream& operator<<(std::ostream& os, TransferStatus::TransferState state);

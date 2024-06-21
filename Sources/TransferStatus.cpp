@@ -34,5 +34,6 @@ TransferStatus::TransferStatus() {
     m_totalBytes = 0;
     m_errorMessage = "";
     m_curlResCode = -1;
+    m_jobId = 0;
     m_state = TransferState::Unknown;
 }

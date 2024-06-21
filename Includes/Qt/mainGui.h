@@ -62,6 +62,7 @@ public slots:
 	void eventFromThreadPoolReceived(int);
 	void onDirectoryCacheUpdated(const std::string& path);
 	void onRemoteFolderKeyPressed();
+	void onTransferStatusUpdated(const TransferStatus& transferStatus);
 public:
 	TreeViewWidget();
 	void populateTreeView();
@@ -111,6 +112,10 @@ private:
 	bool m_isConnected = false;
 
 	TransferManager m_manager;
+
+	QTreeWidget* m_transferStatusWidget;
+	QMap<int, QTreeWidgetItem*> m_transferItems;
+
 	QMutex m_mutex;
 };
 

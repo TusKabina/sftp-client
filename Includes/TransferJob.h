@@ -27,7 +27,9 @@ public:
         m_transferFile.m_remotePath = remotePath;
         m_transferFile.m_remoteDirectoryPath = m_transferFile.m_remotePath.substr(0, m_transferFile.m_remotePath.find_last_of('/'));
         m_jobId = UIDGenerator::getInstance().generateID();
+        m_transferHandle.m_transferStatus.m_jobId = m_jobId;
         m_url = url;
+
     }
 
     [[nodiscard]] const TransferStatus& getTransferStatus() const {return m_transferHandle.m_transferStatus;}

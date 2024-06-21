@@ -133,5 +133,5 @@ void TransferManager::deleteJob(uint64_t jobId) {
 }
 
 void TransferManager::onTransferStatusReceived(TransferStatus status) {
-    //std::cout << "-------------------------------------------------------------TRANSFER RECEIVED-------------------------------------------------------------" << std::endl;
+    emit transferStatusUpdated(status);
 }
