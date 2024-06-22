@@ -6,6 +6,7 @@
 #include <QHeaderView>
 #include <qdatetime.h>
 #include <filesystem>
+
 std::string GetDirectoryName(const std::string& name) {
 	size_t pos = name.find_last_of("\\/");
 	return (std::string::npos == pos) ? "" : name.substr(0, pos);
@@ -272,12 +273,15 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 		m_transferItems[transferStatus.m_jobId] = item;
 		m_transferStatusWidget->addTopLevelItem(item);
 	}
-	uint64_t progress = (transferStatus.m_bytesTransferred / transferStatus.m_totalBytes) * 100;
-	item->setText(0, QString::fromStdString(std::string("Source Path placeholder")));
-	item->setText(1, QString::fromStdString(std::string("Destination Path placeholder")));
-	item->setText(2, QString::fromStdString(std::string("Date placeholder")));
-	item->setText(3, QString::number(transferStatus.m_bytesTransferred) + "B");
-	item->setText(4, QString::number(12) + " MB/s");
+	double progress = (static_cast<double>(transferStatus.m_bytesTransferred) / transferStatus.m_totalBytes) * 100;
+	std::string fileName = FileName(transferStatus.m_source);
+	item->setText(0, QString::fromStdString(fileName));
+	item->setText(1, "Download");
+	item->setText(2, QString::fromStdString(transferStatus.m_source));
+	item->setText(3, QString::fromStdString(transferStatus.m_destination));
+	item->setText(4, QString::number(transferStatus.m_bytesTransferred) + "B");
+	item->setText(5, QString::number(12) + " MB/s");
+	item->setText(6, QString::number(progress,'f',2) + " %");
 }
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
@@ -543,7 +547,9 @@ TreeViewWidget::TreeViewWidget() {
 
 	// Add transfer status widget
 	m_transferStatusWidget = new QTreeWidget(this);
-	m_transferStatusWidget->setHeaderLabels(QStringList() << "Source Path" << "Destination Path" << "Date" << "Bytes transfered" << "Speed");
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "Direction" << "Source Path" << "Destination Path" 
+		<< "Bytes transfered" << "Speed" << "Progress");
+
 	verticalLayout->addWidget(m_transferStatusWidget);
 	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
 	/*connect(&m_threadPool, SIGNAL(WorkDone(int)),

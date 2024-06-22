@@ -36,6 +36,7 @@ public:
     [[nodiscard]] bool isPathInCache(const std::string& path) const { return m_cache.find(path) != m_cache.end(); }
     [[nodiscard]] bool isInitialized() { return m_initialized; }
     [[nodiscard]] bool isFile(const std::string& path);
+    [[nodiscard]] const uint64_t getTotalBytes(const std::string& path, const std::string& fileName);
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_cache; }
     bool getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries);
     bool isRegularFile(const std::string& filePath);

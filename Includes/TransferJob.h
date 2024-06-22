@@ -22,13 +22,15 @@ private:
 public:
     TransferJob() {}
     TransferJob(const std::string localPath, const std::string remotePath, const std::string url) {
+        m_url = url;
         m_transferFile.m_localPath = localPath;
         m_transferFile.m_localDirectoryPath = m_transferFile.m_localPath.substr(0, m_transferFile.m_localPath.find_last_of('/'));
         m_transferFile.m_remotePath = remotePath;
         m_transferFile.m_remoteDirectoryPath = m_transferFile.m_remotePath.substr(0, m_transferFile.m_remotePath.find_last_of('/'));
+        m_transferHandle.m_transferStatus.m_source = localPath;
+        m_transferHandle.m_transferStatus.m_destination = remotePath;
         m_jobId = UIDGenerator::getInstance().generateID();
         m_transferHandle.m_transferStatus.m_jobId = m_jobId;
-        m_url = url;
 
     }
 
@@ -47,7 +49,7 @@ public:
     void setJobId(uint64_t jobId) {m_jobId = jobId;}
     void setTransferHandle(std::shared_ptr<CURL> curlHandle) { m_transferHandle.m_curlHandle = curlHandle; }
     void closeStreamFile();
-
+    void setFileTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
     uint64_t createJob(const std::string localPath, const std::string remotePath, const std::string url);
 
     ~TransferJob();

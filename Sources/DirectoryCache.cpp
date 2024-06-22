@@ -98,6 +98,18 @@ bool DirectoryCache::isFile(const std::string& path) {
     return it != entries.end() && it->m_isFile;
 }
 
+const uint64_t DirectoryCache::getTotalBytes(const std::string& path, const std::string& fileName) {
+   // QMutexLocker locker(&m_mutex);
+    if (!isPathInCache(path)) {
+        return 0;
+    }
+    auto& entries = m_cache.find(path)->second;
+    auto it = std::find_if(entries.begin(), entries.end(), [&fileName](const DirectoryEntry& entry) {
+        return entry.m_name == fileName;
+        });
+    return it != entries.end() ? it->m_totalBytes : 0;
+}
+
 bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries)  {
     QMutexLocker locker(&m_mutex);
     auto it = m_cache.find(path);

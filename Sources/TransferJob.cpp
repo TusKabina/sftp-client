@@ -8,11 +8,8 @@ size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void*
     if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
         size_t bytesWritten = fwrite(buffer, 1, totalSize, job->m_transferFile.m_stream);
-        job->m_transferFile.m_totalBytes = totalSize;
-        job->m_transferFile.m_bytesTransfered += bytesWritten;
 
-        job->m_transferHandle.m_transferStatus.m_totalBytes = job->m_transferFile.m_totalBytes;
-        job->m_transferHandle.m_transferStatus.m_bytesTransferred = job->m_transferFile.m_bytesTransfered;
+        job->m_transferHandle.m_transferStatus.m_bytesTransferred += bytesWritten;
 
         job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
         return bytesWritten;
@@ -77,6 +74,7 @@ void TransferJob::downloadFile() {
         }
         closeStreamFile();
         curl_easy_reset(m_transferHandle.m_curlHandle.get());
+        onTransferStatusUpdated(m_transferHandle.m_transferStatus);
     }
 }
 void TransferJob::uploadFile(const std::string& url) {
@@ -173,9 +171,12 @@ void TransferJob::deleteFile(const std::string& url) {
 void TransferJob::deleteLocalFile(const std::string& path) {
     if (std::remove(path.c_str()) == 0) {
         std::cout << "File successfully deleted\n";
+        m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
     }
     else {
         std::perror("Error deleting file");
+        m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+        m_transferHandle.m_transferStatus.m_errorMessage = "Error deleting file";
     }
 }
 
@@ -199,3 +200,4 @@ void TransferJob::closeStreamFile() {
         m_transferFile.m_stream = nullptr;
     }
 }
+

@@ -16,6 +16,8 @@ struct TransferStatus {
     TransferState m_state;
     size_t m_bytesTransferred;
     size_t m_totalBytes;
+    std::string m_source;
+    std::string m_destination;
     std::string m_errorMessage;
     int m_curlResCode;
     uint64_t m_jobId;
