@@ -36,4 +36,43 @@ TransferStatus::TransferStatus() {
     m_curlResCode = -1;
     m_jobId = 0;
     m_state = TransferState::Unknown;
+    m_speed = 0.0;
+    m_smoothedSpeed = 0.0;
+    m_lastUpdateTime = QDateTime::currentDateTime();
+    m_lastBytesTransferred = 0;
+    m_alpha = 0.1;
+    m_lowSpeedCount = 0;
+    m_highSpeedCount = 0;
+    m_thresholdCount = 1000;
+    signal_threshold = static_cast<size_t>(1024) * 1024 * 2;
+    m_threshold = 0;
+}
+
+void TransferStatus::updateSpeed(size_t bytesTransferred) {
+    QDateTime now = QDateTime::currentDateTime();
+    qint64 duration = m_lastUpdateTime.msecsTo(now);
+
+    if (duration > 0) {
+        size_t bytesSinceLastUpdate = bytesTransferred - m_lastBytesTransferred;
+        m_speed = (bytesSinceLastUpdate / 1024.0 / 1024.0) / (duration / 1000.0);
+        m_smoothedSpeed = m_alpha * m_speed + (1 - m_alpha) * m_smoothedSpeed;
+
+        if (m_smoothedSpeed < m_speed) {
+            m_lowSpeedCount++;
+            m_highSpeedCount = 0;
+        }
+        else {
+            m_highSpeedCount++;
+            m_lowSpeedCount = 0;
+        }
+
+        if (m_lowSpeedCount >= m_thresholdCount || m_highSpeedCount >= m_thresholdCount) {
+            m_speed = m_smoothedSpeed;
+            m_lowSpeedCount = 0;
+            m_highSpeedCount = 0;
+        }
+    }
+
+    m_lastUpdateTime = now;
+    m_lastBytesTransferred = bytesTransferred;
 }

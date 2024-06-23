@@ -9,9 +9,15 @@ size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void*
         size_t totalSize = size * nmemb;
         size_t bytesWritten = fwrite(buffer, 1, totalSize, job->m_transferFile.m_stream);
 
+        job->m_transferHandle.m_transferStatus.updateSpeed(job->m_transferHandle.m_transferStatus.m_bytesTransferred);
         job->m_transferHandle.m_transferStatus.m_bytesTransferred += bytesWritten;
+        job->m_transferHandle.m_transferStatus.m_threshold += bytesWritten;
 
-        job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
+        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.signal_threshold) {
+            job->m_transferHandle.m_transferStatus.m_threshold = 0;
+            job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
+
+        }
         return bytesWritten;
     } else {
         return 0;
@@ -44,6 +50,7 @@ void TransferJob::downloadFile() {
         }
 
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + m_transferFile.m_remotePath).c_str());
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
 

@@ -280,7 +280,7 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(2, QString::fromStdString(transferStatus.m_source));
 	item->setText(3, QString::fromStdString(transferStatus.m_destination));
 	item->setText(4, QString::number(transferStatus.m_bytesTransferred) + "B");
-	item->setText(5, QString::number(12) + " MB/s");
+	item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
 	item->setText(6, QString::number(progress,'f',2) + " %");
 }
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
