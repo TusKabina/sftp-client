@@ -283,6 +283,42 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
 	item->setText(6, QString::number(progress,'f',2) + " %");
 }
+void TreeViewWidget::onCopyAction() {
+	m_sourcePath = m_textCommandParameterRemote;
+	m_isCutOperation = false;
+}
+void TreeViewWidget::onCutAction() {
+	m_sourcePath = m_textCommandParameterRemote;
+	m_isCutOperation = true;
+}
+void TreeViewWidget::onPasteAction() {
+	QString destinationPath = m_textCommandParameterRemote;
+	if (m_isCutOperation) {
+
+		std::string sourcePath = m_sourcePath.toStdString();
+		std::string destPath = destinationPath.toStdString() + "/" + std::filesystem::path(sourcePath).filename().string();
+		if (std::filesystem::exists(sourcePath)) {
+			std::filesystem::rename(sourcePath, destPath);
+		}
+	}
+	else {
+		// Perform copy operation
+		std::string sourcePath = "/" + m_sourcePath.toStdString();
+		std::string destPath = "/" + destinationPath.toStdString() + "/" + std::filesystem::path(sourcePath).filename().string();
+		uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
+		m_manager.submitJob(copyJobId, JobOperation::COPY);
+		//if (m_manager.isRegularFile(sourcePath)) {
+
+		//	uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
+		//	m_manager.submitJob(copyJobId, JobOperation::COPY);
+		//}
+		//else {
+		//	//Write in debug log error.
+		//}
+	}
+	m_sourcePath.clear();
+	m_isCutOperation = false;
+}
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_textCommandParameterLocal = ((QFileSystemModel*)m_treeView->model())->filePath(index);
@@ -368,6 +404,15 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pDownload = menu.addAction(trUtf8("Download"));
 	QAction* Pdelete = menu.addAction(trUtf8("Delete"));
+	QAction* pCopy = menu.addAction(trUtf8("Copy"));
+	QAction* pCut = menu.addAction(trUtf8("Cut"));
+
+	if (!m_sourcePath.isEmpty()) {
+		QAction* pPaste = menu.addAction(trUtf8("Paste"));
+		connect(pPaste, &QAction::triggered, this, &TreeViewWidget::onPasteAction);
+	}
+	connect(pCopy, &QAction::triggered, this, &TreeViewWidget::onCopyAction);
+	connect(pCut, &QAction::triggered, this, &TreeViewWidget::onCutAction);
 
 	QAction* pSelected = menu.exec(m_treeWidget->mapToGlobal(event->pos()));
 
@@ -384,16 +429,6 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 
 			m_textDebugLog.append("Downloading: /" + m_textCommandParameterRemote);
 			m_textDebugLog.append("Local directory: " + m_directoryNameLocal + QString::fromStdString(remoteFileName));
-
-			/*auto func = [=]() {
-				std::string localPath = m_directoryNameLocal.toStdString() + remoteFileName;
-				
-				uint64_t downloadJobId = m_manager.prepareJob(localPath, remotePath);
-				m_manager.executeJob(downloadJobId, JobOperation::DOWNLOAD);
-				std::thread::id this_id = std::this_thread::get_id();
-				std::cout << "thread " << this_id << " func...\n";
-			};*/
-			
 		
 			std::string localPath = m_directoryNameLocal.toStdString() + remoteFileName;
 

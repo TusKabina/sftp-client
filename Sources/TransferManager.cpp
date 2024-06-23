@@ -70,7 +70,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 }
                 break;
             case JobOperation::COPY:
-                (*job)->copyFile(m_url);
+                (*job)->copyFile();
                 break;
             case JobOperation::MOVE:
                // m_DirectoryCache.refreshDirectory((*job)->getLocalDirectoryPath() + "/");

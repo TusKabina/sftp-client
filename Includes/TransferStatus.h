@@ -24,13 +24,15 @@ struct TransferStatus {
     uint64_t m_jobId;
     double m_speed;
     double m_smoothedSpeed;
+    double m_progress;
     size_t m_threshold;
     size_t signal_threshold;
 
+    QDateTime m_startTime;
     QDateTime m_lastUpdateTime;
     size_t m_lastBytesTransferred;
 
-    // For smoothing and filtering
+    // Smoothing and filtering download speed
     double m_alpha;
     int m_lowSpeedCount;
     int m_highSpeedCount;

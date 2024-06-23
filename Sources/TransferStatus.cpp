@@ -43,18 +43,20 @@ TransferStatus::TransferStatus() {
     m_alpha = 0.1;
     m_lowSpeedCount = 0;
     m_highSpeedCount = 0;
-    m_thresholdCount = 1000;
-    signal_threshold = static_cast<size_t>(1024) * 1024 * 2;
+    m_thresholdCount = 5;
+    signal_threshold = static_cast<size_t>(1024) * 1024 * 2; // after how many MB to trigger signal for updating transfer status
     m_threshold = 0;
+    m_lastUpdateTime = QDateTime::currentDateTime();
 }
 
 void TransferStatus::updateSpeed(size_t bytesTransferred) {
     QDateTime now = QDateTime::currentDateTime();
-    qint64 duration = m_lastUpdateTime.msecsTo(now);
+    qint64 durationSinceLastUpdate = m_lastUpdateTime.msecsTo(now);
+    qint64 totalDuration = m_startTime.msecsTo(now);
 
-    if (duration > 0) {
-        size_t bytesSinceLastUpdate = bytesTransferred - m_lastBytesTransferred;
-        m_speed = (bytesSinceLastUpdate / 1024.0 / 1024.0) / (duration / 1000.0);
+    if (totalDuration > 0) { 
+        m_speed = (bytesTransferred / 1024.0 / 1024.0) / (totalDuration / 1000.0); // MB/S
+
         m_smoothedSpeed = m_alpha * m_speed + (1 - m_alpha) * m_smoothedSpeed;
 
         if (m_smoothedSpeed < m_speed) {

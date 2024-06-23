@@ -62,7 +62,7 @@ private:
 public:
     void downloadFile();
     void uploadFile(const std::string& url);
-    void copyFile(const std::string& url);
+    void copyFile();
     void moveFile(const std::string& url);
     void deleteFile(const std::string& url);
     void deleteLocalFile(const std::string& path);
