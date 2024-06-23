@@ -1,6 +1,7 @@
 #include "TransferManager.h"
 #include <algorithm>
-
+#include <QFileInfo>
+#include <qstring.h>
 void TransferManager::setCredentials(const std::string& host, const std::string& username, const std::string& password) {
     m_url = "sftp://" + username + ":" + password + "@" + host;
     m_username = username;
@@ -63,12 +64,21 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                // m_DirectoryCache.refreshDirectory(job->getLocalDirectoryPath() + "/");
                 break;
             case JobOperation::UPLOAD:
+            {
+                QString localPath = QString::fromStdString((*job)->getLocalPath());
+
+                QFileInfo localFile(localPath);
+                uint64_t totalBytes = localFile.size();
+
+                (*job)->setFileTotalBytes(totalBytes);
                 (*job)->uploadFile(m_url);
+
                 {
                     QMutexLocker locker(&m_mutex);
                     m_DirectoryCache.refreshDirectory(remotePath);
                 }
                 break;
+            }
             case JobOperation::COPY:
                 (*job)->copyFile();
                 break;

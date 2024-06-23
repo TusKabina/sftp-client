@@ -78,3 +78,33 @@ void TransferStatus::updateSpeed(size_t bytesTransferred) {
     m_lastUpdateTime = now;
     m_lastBytesTransferred = bytesTransferred;
 }
+
+const std::string TransferStatus::TransferStatetoString() const {
+    std::string strState;
+    switch (m_state) {
+    case TransferStatus::TransferState::Initialized:
+        strState = "Initialized";
+        break;
+    case TransferStatus::TransferState::Pending:
+        strState = "Pending";
+        break;
+    case TransferStatus::TransferState::InProgress:
+        strState = "In Progress";
+        break;
+    case TransferStatus::TransferState::Completed:
+        strState = "Completed";
+        break;
+    case TransferStatus::TransferState::Failed:
+        strState = "Failed";
+        break;
+    case TransferStatus::TransferState::Canceled:
+        strState = "Canceled";
+        break;
+    case TransferStatus::TransferState::Unknown:
+        strState = "Unknown";
+    default:
+        strState = "Invalid State";
+        break;
+    }
+    return strState;
+}

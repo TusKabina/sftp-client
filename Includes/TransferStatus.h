@@ -17,20 +17,22 @@ struct TransferStatus {
     TransferState m_state;
     size_t m_bytesTransferred;
     size_t m_totalBytes;
+    size_t m_threshold;
+    size_t signal_threshold;
+    size_t m_lastBytesTransferred;
+    uint64_t m_jobId;
+    
     std::string m_source;
     std::string m_destination;
     std::string m_errorMessage;
+    
     int m_curlResCode;
-    uint64_t m_jobId;
     double m_speed;
     double m_smoothedSpeed;
     double m_progress;
-    size_t m_threshold;
-    size_t signal_threshold;
 
     QDateTime m_startTime;
     QDateTime m_lastUpdateTime;
-    size_t m_lastBytesTransferred;
 
     // Smoothing and filtering download speed
     double m_alpha;
@@ -40,6 +42,7 @@ struct TransferStatus {
 
     TransferStatus();
     void updateSpeed(size_t bytesTransferred);
+    const std::string TransferStatetoString() const;
 };
 inline std::ostream& operator<<(std::ostream& os, TransferStatus::TransferState state);
 

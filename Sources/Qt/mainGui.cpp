@@ -207,7 +207,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
 			if(transferManager.isRegularFile("/" + remotePath.toStdString())) {
 				std::string directoryPath = GetDirectoryName("/" + remotePath.toStdString());
-				remotePath = "/" + QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
+				remotePath = QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
 			}
 			else {
 				remotePath = "/" + remotePath + "/" + fileName.c_str();
@@ -249,8 +249,7 @@ void TreeViewWidget::eventFromThreadPoolReceived(int id) {
 	std::cout << "TreeViewWidget " << this_id << " " << id << " thread...\n";
 }
 
-void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path)
-{
+void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path) {
 	refreshTreeViewRoot(path);
 }
 
@@ -259,8 +258,6 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 	if (path.back() != '/') {
 		path = path + "/";
 	}
-	
-
 }
 
 void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatus) {
@@ -273,15 +270,15 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 		m_transferItems[transferStatus.m_jobId] = item;
 		m_transferStatusWidget->addTopLevelItem(item);
 	}
-	double progress = (static_cast<double>(transferStatus.m_bytesTransferred) / transferStatus.m_totalBytes) * 100;
+
 	std::string fileName = FileName(transferStatus.m_source);
 	item->setText(0, QString::fromStdString(fileName));
-	item->setText(1, "Download");
+	item->setText(1, QString::fromStdString(transferStatus.TransferStatetoString()));
 	item->setText(2, QString::fromStdString(transferStatus.m_source));
 	item->setText(3, QString::fromStdString(transferStatus.m_destination));
 	item->setText(4, QString::number(transferStatus.m_bytesTransferred) + "B");
 	item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
-	item->setText(6, QString::number(progress,'f',2) + " %");
+	item->setText(6, QString::number(transferStatus.m_progress,'f',2) + " %");
 }
 void TreeViewWidget::onCopyAction() {
 	m_sourcePath = m_textCommandParameterRemote;
@@ -582,8 +579,12 @@ TreeViewWidget::TreeViewWidget() {
 
 	// Add transfer status widget
 	m_transferStatusWidget = new QTreeWidget(this);
-	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "Direction" << "Source Path" << "Destination Path" 
-		<< "Bytes transfered" << "Speed" << "Progress");
+	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_transferStatusWidget->setColumnCount(7);
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "Direction" << "Source Path" << "Destination Path"
+		<< "Bytes Transferred" << "Speed" << "Progress");
+	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_transferStatusWidget->setSortingEnabled(true);
 
 	verticalLayout->addWidget(m_transferStatusWidget);
 	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
@@ -616,7 +617,6 @@ void TreeViewWidget::populateTreeView() {
 			
 			QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 			item->setText(0, QString::fromStdString(entry.m_name));
-			item->setText(1, convertSize(entry.m_totalBytes));
 			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 			item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
 
@@ -625,6 +625,7 @@ void TreeViewWidget::populateTreeView() {
 				item->setData(0, Qt::UserRole, true);
 			}
 			else {
+				item->setText(1, convertSize(entry.m_totalBytes));
 				item->setIcon(0, QPixmap("file.png"));
 				item->setData(0, Qt::UserRole, false);
 			}
@@ -651,7 +652,6 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 
 		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 		item->setText(0, QString::fromStdString(entry.m_name));
-		item->setText(1, convertSize(entry.m_totalBytes));
 		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 		item->setText(3, formattedDate);
 
@@ -660,6 +660,7 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 			item->setData(0, Qt::UserRole, true);
 		}
 		else {
+			item->setText(1, convertSize(entry.m_totalBytes));
 			item->setIcon(0, QPixmap("file.png"));
 			item->setData(0, Qt::UserRole, false);
 		}
@@ -683,7 +684,6 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
 		item->setText(0, QString::fromStdString(entry.m_name));
-		item->setText(1, convertSize(entry.m_totalBytes));
 		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 		item->setText(3, dateTime.toString("MM/dd/yyyy HH:mm:ss"));
 		if (entry.m_isDirectory) {
@@ -691,6 +691,7 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 			item->setData(0, Qt::UserRole, true);
 		}
 		else {
+			item->setText(1, convertSize(entry.m_totalBytes));
 			item->setIcon(0, QPixmap("file.png"));
 			item->setData(0, Qt::UserRole, false);
 		}

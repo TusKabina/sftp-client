@@ -57,7 +57,7 @@ public:
 private:
     static size_t WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent);
     static size_t dummyWriteCallback(void* ptr, size_t size, size_t nmemb, void* stream);
-    static size_t ReadCallback(void *buffer, size_t size, size_t nmemb, TransferFile* transferFile);
+    static size_t ReadCallback(void *buffer, size_t size, size_t nmemb, void* parent);
 
 public:
     void downloadFile();

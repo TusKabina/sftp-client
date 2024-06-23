@@ -15,11 +15,14 @@ size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void*
 
         if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.signal_threshold) {
             job->m_transferHandle.m_transferStatus.m_threshold = 0;
-            job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
+            job->m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(job->m_transferHandle.m_transferStatus.m_bytesTransferred) / 
+                job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
 
+            job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
         }
         return bytesWritten;
-    } else {
+    } 
+    else {
         return 0;
     }
 }
@@ -28,12 +31,21 @@ size_t TransferJob::dummyWriteCallback(void* ptr, size_t size, size_t nmemb, voi
     return size * nmemb;
 }
 
-size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, TransferFile* transferFile) {
-    if (transferFile->m_stream) {
+size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
+    TransferJob* job = static_cast<TransferJob*>(parent);
+    if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
-        size_t bytesRead = fread(buffer, 1, totalSize, transferFile->m_stream);
-        transferFile->m_totalBytes = totalSize;
-        transferFile->m_bytesTransfered += bytesRead;
+        size_t bytesRead = fread(buffer, 1, totalSize, job->m_transferFile.m_stream);
+        job->m_transferHandle.m_transferStatus.updateSpeed(job->m_transferHandle.m_transferStatus.m_bytesTransferred);
+        job->m_transferHandle.m_transferStatus.m_bytesTransferred += bytesRead;
+        job->m_transferHandle.m_transferStatus.m_threshold += bytesRead;
+
+        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.signal_threshold) {
+            job->m_transferHandle.m_transferStatus.m_threshold = 0;
+            job->m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(job->m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+            job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
+        }
         return bytesRead;
     }
     return 0;
@@ -54,24 +66,11 @@ void TransferJob::downloadFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
 
-        std::cout << "---------------------------------UNUTAR DOWNLOAD---------------------------------------------------" << std::endl;
-        std::cout << "REMOTEPATH: " << m_transferFile.m_remotePath << std::endl;
-        std::cout << "LOCALPATH: " << m_transferFile.m_localPath << std::endl;
-        std::cout << "JOBID " << m_jobId << std::endl;
-        std::cout << "---------------------------------UNUTAR DOWNLOAD---------------------------------------------------" << std::endl;
-
         m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
-        CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
-        std::thread::id this_id = std::this_thread::get_id();
-        std::cout << "THREAD ID " << this_id << "OVO JE THREAD ID!!!!!!!!!!!!!!!!!!!!!!!\n";
-        std::cout << "CURL ADDRESS: " << (m_transferHandle.m_curlHandle.get()) << std::endl;
-        std::cout << "---------------------------------NAKON PERFORME---------------------------------------------------" << std::endl;
-        std::cout << "REMOTEPATH: " << m_transferFile.m_remotePath << std::endl;
-        std::cout << "LOCALPATH: " << m_transferFile.m_localPath << std::endl;
-        std::cout << "JOBID " << m_jobId << std::endl;
-        std::cout << "---------------------------------NAKON PERFORME---------------------------------------------------" << std::endl;
 
+        CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
+       
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
@@ -82,6 +81,10 @@ void TransferJob::downloadFile() {
         }
         closeStreamFile();
         curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+        m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+            m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
         onTransferStatusUpdated(m_transferHandle.m_transferStatus);
     }
 }
@@ -97,10 +100,11 @@ void TransferJob::uploadFile(const std::string& url) {
 
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (url + m_transferFile.m_remotePath).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD, 1L);
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L); // 128KB
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READFUNCTION, TransferJob::ReadCallback);
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READDATA, &m_transferFile);
-
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READDATA, this);
+       
+        m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
         std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << "\n";
         std::cout << "[UPLOAD] REMOTE PATH: " << m_transferFile.m_remotePath << "\n";
@@ -118,6 +122,11 @@ void TransferJob::uploadFile(const std::string& url) {
         //TODO: make custom deleter for CURL shared_ptr where on each decrement curl_easy_reset will be called
         closeStreamFile();
         curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+        m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+            m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+        onTransferStatusUpdated(m_transferHandle.m_transferStatus);
     }
 }
 
