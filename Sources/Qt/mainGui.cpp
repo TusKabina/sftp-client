@@ -292,11 +292,13 @@ void TreeViewWidget::onPasteAction() {
 	QString destinationPath = m_textCommandParameterRemote;
 	if (m_isCutOperation) {
 
-		std::string sourcePath = m_sourcePath.toStdString();
-		std::string destPath = destinationPath.toStdString() + "/" + std::filesystem::path(sourcePath).filename().string();
-		if (std::filesystem::exists(sourcePath)) {
+		std::string sourcePath = "/" + m_sourcePath.toStdString();
+		std::string destPath = "/" + destinationPath.toStdString() + "/" + std::filesystem::path(sourcePath).filename().string();
+		/*if (std::filesystem::exists(sourcePath)) {
 			std::filesystem::rename(sourcePath, destPath);
-		}
+		}*/
+		uint64_t moveJobId = m_manager.prepareJob(sourcePath, destPath);
+		m_manager.submitJob(moveJobId, JobOperation::MOVE);
 	}
 	else {
 		// Perform copy operation

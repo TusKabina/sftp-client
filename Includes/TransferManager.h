@@ -19,7 +19,6 @@ class CurlThreadPool : public QThreadPool {
 public:
     CurlThreadPool() : QThreadPool() {
         setMaxThreadCount(20);
-        
     }
 
     std::shared_ptr<CURL> getCurlForCurrentThread() {
