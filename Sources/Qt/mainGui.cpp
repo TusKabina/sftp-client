@@ -732,7 +732,7 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 void TreeViewWidget::findAndExpandPath(const QString& path) {
 	QStringList pathParts = path.split("/", Qt::SkipEmptyParts);
 	QTreeWidgetItem* currentItem = nullptr;
-	// Iterate over top-level items to find the starting point
+	
 	for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
 		QTreeWidgetItem* item = m_treeWidget->topLevelItem(i);
 		std::string strItemText = item->text(0).toStdString();
@@ -743,7 +743,6 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 		}
 	}
 
-	// If the starting point is not found, return
 	if (!currentItem) {
 		m_textDebugLog.append("The starting path was not found in the tree.");
 		return;
@@ -751,12 +750,11 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 
 	QString currentPath = pathParts[0];
 	std::string strCurrentPath = pathParts[0].toStdString();
-	// Iterate through the path parts and expand the tree
+	
 	for (int i = 1; i < pathParts.size(); ++i) {
 		bool found = false;
 		currentPath += "/" + pathParts[i];
 		strCurrentPath = currentPath.toStdString();
-		// Check if the current part exists in the tree
 		for (int j = 0; j < currentItem->childCount(); ++j) {
 			QTreeWidgetItem* child = currentItem->child(j);
 			std::string strChildText = child->text(0).toStdString();
@@ -768,11 +766,8 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 			}
 		}
 
-		// If the part is not found, fetch and populate it from the cache
 		if (!found || !currentItem->data(0, Qt::UserRole + 1).toBool()) {
 			populateTreeWidgetViewDirectory(currentItem, currentPath);
-
-			// After populating, find the newly added item
 			for (int j = 0; j < currentItem->childCount(); ++j) {
 				QTreeWidgetItem* child = currentItem->child(j);
 				if (child->text(0) == pathParts[i]) {
@@ -781,13 +776,11 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 					break;
 				}
 			}
-
 			if (!found) {
 				m_textDebugLog.append("The path " + currentPath + " was not found in the tree.");
 				return;
 			}
 		}
-
 		currentItem->setExpanded(true);
 		m_treeWidget->scrollToItem(currentItem);
 	}

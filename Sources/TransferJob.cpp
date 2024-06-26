@@ -136,8 +136,9 @@ void TransferJob::uploadFile(const std::string& url) {
         if (res != CURLE_OK) {
             
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            m_transferHandle.m_transferStatus.m_errorMessage = "[UPLOAD] Error Message: Curl easy perform error: " + std::string(curl_easy_strerror(res));
             std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << m_transferHandle.m_transferStatus.m_errorMessage << "\n";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
@@ -163,6 +164,7 @@ void TransferJob::copyFile() {
         if (!m_transferFile.m_stream) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Failed to open file for writing!";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
             return;
         }
 
@@ -179,8 +181,9 @@ void TransferJob::copyFile() {
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " RemotePath: " + m_transferFile.m_localPath;
-            std::cout << "[COPY] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DOWNLOAD] Error Message: Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " RemotePath: " + m_transferFile.m_localPath;
+            std::cout << "[DOWNLOAD] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
 
             closeStreamFile();
             curl_easy_reset(m_transferHandle.m_curlHandle.get());
@@ -191,6 +194,8 @@ void TransferJob::copyFile() {
             curl_easy_reset(m_transferHandle.m_curlHandle.get());
             m_transferFile.m_localDirectoryPath = "";
             m_transferFile.m_localPath = remoteFileName;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DOWNLOAD] Download source: " + m_transferFile.m_remotePath + " is finished. Starting upload";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
             uploadFile(m_url);
         }
         deleteLocalFile(m_transferFile.m_localPath);
@@ -268,8 +273,9 @@ void TransferJob::deleteLocalFile(const std::string& path) {
     else {
         std::perror("Error deleting file");
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-        m_transferHandle.m_transferStatus.m_errorMessage = "Error deleting file";
+        m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE_LOCAL] Error Message: Error deleting file";
         std::cout << "[DELETE_LOCAL] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+        onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
     }
 }
 

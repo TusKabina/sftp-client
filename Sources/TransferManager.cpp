@@ -86,10 +86,20 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 break;
             }
             case JobOperation::COPY:
+                {
+                    QMutexLocker locker(&m_mutex);
+                    std::string source = (*job)->getLocalDirectoryPath() + "/";
+                    std::string sourceFileName = (*job)->getLocalPath().substr(source.size(), (*job)->getRemotePath().size());
+                    uint64_t totalBytes = m_DirectoryCache.getTotalBytes(source, sourceFileName);
+                    (*job)->setFileTotalBytes(totalBytes * 2);
+                }
                 (*job)->copyFile();
+                {
+                    QMutexLocker locker(&m_mutex);
+                    m_DirectoryCache.refreshDirectory(remoteDirPath);
+                }
                 break;
             case JobOperation::MOVE:
-              
                 (*job)->moveFile(m_url);
                 {
                    QMutexLocker locker(&m_mutex);
