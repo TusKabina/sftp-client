@@ -50,7 +50,8 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
     (*job)->setTransferHandle(curl);
 
     if(job != m_transferJobs.end()) {
-        std::string remotePath = (*job)->getRemoteDirectoryPath() + "/";
+        std::string remoteDirPath = (*job)->getRemoteDirectoryPath() + "/";
+
         switch (jobType) {
             case JobOperation::DOWNLOAD:
                 {
@@ -75,7 +76,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
 
                 {
                     QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory(remotePath);
+                    m_DirectoryCache.refreshDirectory(remoteDirPath);
                 }
                 break;
             }
@@ -83,15 +84,18 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 (*job)->copyFile();
                 break;
             case JobOperation::MOVE:
-               // m_DirectoryCache.refreshDirectory((*job)->getLocalDirectoryPath() + "/");
-               // m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
+              
                 (*job)->moveFile(m_url);
+                {
+                   m_DirectoryCache.refreshDirectory(localDirPath);
+                   m_DirectoryCache.refreshDirectory(remoteDirPath);
+                }
                 break;
             case JobOperation::DELETE:
                 (*job)->deleteFile(m_url);
                 {
                     QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory((*job)->getRemoteDirectoryPath() + "/");
+                    m_DirectoryCache.refreshDirectory(remoteDirPath);
                 }
                 break;
             case JobOperation::DELETE_LOCAL:

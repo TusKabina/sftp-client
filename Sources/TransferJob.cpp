@@ -145,6 +145,7 @@ void TransferJob::copyFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
 
+        m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
 
@@ -152,6 +153,8 @@ void TransferJob::copyFile() {
             m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " RemotePath: " + m_transferFile.m_localPath;
+            std::cout << "[COPY] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+
             closeStreamFile();
             curl_easy_reset(m_transferHandle.m_curlHandle.get());
         }
@@ -184,6 +187,8 @@ void TransferJob::moveFile(const std::string& url) {
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            std::cout << "[MOVE] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
@@ -210,6 +215,7 @@ void TransferJob::deleteFile(const std::string& url) {
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            std::cout << "[DELETE] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
@@ -228,6 +234,7 @@ void TransferJob::deleteLocalFile(const std::string& path) {
         std::perror("Error deleting file");
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
         m_transferHandle.m_transferStatus.m_errorMessage = "Error deleting file";
+        std::cout << "[DELETE_LOCAL] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
     }
 }
 

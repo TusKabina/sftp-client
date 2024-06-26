@@ -72,6 +72,8 @@ public:
 	void refreshTreeViewRoot(const std::string& path);
 	void updateTreeView(const std::string& path);
 	void insertTreeViewWidget();
+	void findAndExpandPath(const QString& path);
+	void populateTreeWidgetViewDirectory(QTreeWidgetItem* parentItem, const QString& path);
 
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
