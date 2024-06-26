@@ -92,9 +92,9 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
               
                 (*job)->moveFile(m_url);
                 {
-                    QMutexLocker locker(&m_mutex);
-                   m_DirectoryCache.refreshDirectory(localDirPath);
-                   m_DirectoryCache.refreshDirectory(remoteDirPath);
+                   QMutexLocker locker(&m_mutex);
+                  /* m_DirectoryCache.refreshDirectory(localDirPath);
+                   m_DirectoryCache.refreshDirectory(remoteDirPath);*/
                 }
                 break;
             case JobOperation::DELETE:

@@ -643,9 +643,17 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 	if (!root) {
 		return;
 	}
-	
+
 	const auto entries = m_manager.getDirectoryList(path);
 
+	// Create a map of existing items for quick lookup
+	QMap<QString, QTreeWidgetItem*> existingItems;
+	for (int i = 0; i < root->childCount(); ++i) {
+		QTreeWidgetItem* child = root->child(i);
+		existingItems.insert(child->text(0), child);
+	}
+
+	// Add or update items based on the directory entries
 	QSet<QString> newItems;
 	for (const auto& entry : entries) {
 		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
@@ -655,17 +663,9 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		QString entryName = QString::fromStdString(entry.m_name);
 		newItems.insert(entryName);
 
-		QTreeWidgetItem* item = nullptr;
-		for (int i = 0; i < root->childCount(); ++i) {
-			QTreeWidgetItem* child = root->child(i);
-			if (child->text(0) == entryName) {
-				item = child;
-				break;
-			}
-		}
-
+		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
 		if (!item) {
-			// Create new item
+			// Create new item if it doesn't exist
 			item = new QTreeWidgetItem(root);
 			root->addChild(item);
 		}
@@ -688,14 +688,15 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		}
 	}
 
-	for (int i = root->childCount() - 1; i >= 0; --i) {
-		QTreeWidgetItem* child = root->child(i);
-		if (!newItems.contains(child->text(0))) {
-			delete root->takeChild(i);
+	// Remove items that no longer exist in the directory
+	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
+		if (!newItems.contains(it.key())) {
+			delete it.value();
 		}
 	}
-
-	root->setExpanded(true);
+	m_treeWidget->update();
+	m_treeWidget->repaint();
+	m_treeWidget->viewport()->update();
 }
 
 void TreeViewWidget::updateTreeView(const std::string& path) {

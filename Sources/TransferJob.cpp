@@ -201,8 +201,8 @@ void TransferJob::copyFile() {
 void TransferJob::moveFile(const std::string& url) {
     if (m_transferHandle.m_curlHandle.get()) {
         struct curl_slist* header = NULL;
-        std::string encodedLocalPath = urlEncoder(m_url + m_transferFile.m_localPath);
-        std::string encodedRemotePath = urlEncoder(m_url + m_transferFile.m_remotePath);
+        std::string encodedLocalPath = urlEncoder(m_transferFile.m_localPath);
+        std::string encodedRemotePath = urlEncoder(m_transferFile.m_remotePath);
 
         std::string renameCommand = "rename " + encodedLocalPath + " " + encodedRemotePath;
         header = curl_slist_append(header, renameCommand.c_str());
