@@ -63,6 +63,7 @@ public slots:
 	void onDirectoryCacheUpdated(const std::string& path);
 	void onRemoteFolderKeyPressed();
 	void onTransferStatusUpdated(const TransferStatus& transferStatus);
+	void onErrorMessageReceived(const std::string errorMessage);
 	void onCopyAction();
 	void onCutAction();
 	void onPasteAction();

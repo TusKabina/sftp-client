@@ -2,6 +2,21 @@
 #include <iostream> //TODO: DELETE
 #include <sstream>
 #include <algorithm>
+
+std::string urlEncode(const std::string& url) {
+    std::string encoded;
+    char hex[4];
+    for (char c : url) {
+        if (c == ' ') {
+            encoded += "%20";
+        }
+        else {
+            encoded += c;
+        }
+    }
+    return encoded;
+}
+
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
     m_curlCode = 0;
@@ -66,8 +81,10 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     }
     std::string fullUrl = m_baseUrl + path;
     std::string response;
+    std::string encodedUrl = urlEncode(fullUrl);
 
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
+
+    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, encodedUrl.c_str());
     curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
 

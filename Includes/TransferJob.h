@@ -14,6 +14,7 @@ class TransferJob : public QObject{
     Q_OBJECT
 signals:
     void onTransferStatusUpdated(TransferStatus status);
+    void onErrorMessage(const std::string message);
 private:
     TransferHandle m_transferHandle;
     TransferFile m_transferFile;

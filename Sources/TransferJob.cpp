@@ -3,6 +3,20 @@
 #include <thread>
 #include <cstdio>
 
+std::string urlEncoder(const std::string& url) {
+    std::string encoded;
+    char hex[4];
+    for (char c : url) {
+        if (c == ' ') {
+            encoded += "%20";
+        }
+        else {
+            encoded += c;
+        }
+    }
+    return encoded;
+}
+
 size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
     TransferJob* job = static_cast<TransferJob*>(parent);
     if (job->m_transferFile.m_stream) {
@@ -57,11 +71,14 @@ void TransferJob::downloadFile() {
         m_transferFile.m_stream = fopen(m_transferFile.m_localPath.c_str(), "wb");
         if (!m_transferFile.m_stream) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Failed to open file for writing!";
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DOWNLOAD] ERROR: Failed to open file for writing!";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
             return;
         }
 
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + m_transferFile.m_remotePath).c_str());
+        std::string encodedUrl = urlEncoder(m_url + m_transferFile.m_remotePath);
+
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (encodedUrl).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
@@ -74,10 +91,13 @@ void TransferJob::downloadFile() {
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " LocalPath: " + m_transferFile.m_localPath;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DOWNLOAD] ERROR: Curl easy perform error: " + std::string(curl_easy_strerror(res)) + " LocalPath: " + m_transferFile.m_localPath;
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DOWNLOAD] Download source: " + m_transferFile.m_remotePath + " is finished";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         closeStreamFile();
         curl_easy_reset(m_transferHandle.m_curlHandle.get());
@@ -95,10 +115,13 @@ void TransferJob::uploadFile(const std::string& url) {
         {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
             m_transferHandle.m_transferStatus.m_errorMessage = "Failed to open file for reading!";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
             return;
         }
 
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (url + m_transferFile.m_remotePath).c_str());
+        std::string encodedUrl = urlEncoder(m_url + m_transferFile.m_remotePath);
+       
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (encodedUrl).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD, 1L);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READFUNCTION, TransferJob::ReadCallback);
@@ -118,6 +141,8 @@ void TransferJob::uploadFile(const std::string& url) {
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[UPLOAD] Upload source: " + m_transferFile.m_localPath + " is finished";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         //TODO: make custom deleter for CURL shared_ptr where on each decrement curl_easy_reset will be called
         closeStreamFile();
@@ -141,7 +166,9 @@ void TransferJob::copyFile() {
             return;
         }
 
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + m_transferFile.m_localPath).c_str());
+        std::string encodedUrl = urlEncoder(m_url + m_transferFile.m_localPath);
+
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (encodedUrl).c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
 
@@ -174,7 +201,10 @@ void TransferJob::copyFile() {
 void TransferJob::moveFile(const std::string& url) {
     if (m_transferHandle.m_curlHandle.get()) {
         struct curl_slist* header = NULL;
-        std::string renameCommand = "rename " + m_transferFile.m_localPath + " " + m_transferFile.m_remotePath;
+        std::string encodedLocalPath = urlEncoder(m_url + m_transferFile.m_localPath);
+        std::string encodedRemotePath = urlEncoder(m_url + m_transferFile.m_remotePath);
+
+        std::string renameCommand = "rename " + encodedLocalPath + " " + encodedRemotePath;
         header = curl_slist_append(header, renameCommand.c_str());
 
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, url.c_str());
@@ -186,12 +216,14 @@ void TransferJob::moveFile(const std::string& url) {
         
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            m_transferHandle.m_transferStatus.m_errorMessage = "[MOVE] Error Message: Curl easy perform error: " + std::string(curl_easy_strerror(res));
             std::cout << "[MOVE] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
-
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[MOVE] Move source: " + m_transferFile.m_localPath + " is finished";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         curl_slist_free_all(header);
     }
@@ -214,11 +246,14 @@ void TransferJob::deleteFile(const std::string& url) {
 
         if (res != CURLE_OK) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            m_transferHandle.m_transferStatus.m_errorMessage = "Curl easy perform error: " + std::string(curl_easy_strerror(res));
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE] Error Message: Curl easy perform error: " + std::string(curl_easy_strerror(res));
             std::cout << "[DELETE] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE] Delete file: " + m_transferFile.m_remotePath + " completed.";
+            onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         curl_slist_free_all(header);
     }

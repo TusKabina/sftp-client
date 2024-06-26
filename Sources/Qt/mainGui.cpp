@@ -263,6 +263,9 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 	findAndExpandPath(QString::fromStdString(path));
 
 }
+void TreeViewWidget::onErrorMessageReceived(const std::string errorMessage) {
+	m_textDebugLog.append(QString::fromStdString(errorMessage));
+}
 
 void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatus) {
 	QTreeWidgetItem* item;
@@ -284,6 +287,7 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
 	item->setText(6, QString::number(transferStatus.m_progress,'f',2) + " %");
 }
+
 void TreeViewWidget::onCopyAction() {
 	m_sourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = false;
@@ -572,6 +576,7 @@ TreeViewWidget::TreeViewWidget() {
 	horizontalLayoutUploadDownloadParameters->addWidget(m_remoteFolderLabel);
 	horizontalLayoutUploadDownloadParameters->addWidget(m_remoteFolderLineEdit);
 
+	connect(&m_manager, &TransferManager::errorMessageSent, this, &TreeViewWidget::onErrorMessageReceived);
 	connect(m_remoteFolderLineEdit, &QLineEdit::returnPressed, this, &TreeViewWidget::onRemoteFolderKeyPressed);
 
 	//Add all widgets to layout
@@ -593,7 +598,6 @@ TreeViewWidget::TreeViewWidget() {
 
 	verticalLayout->addWidget(m_transferStatusWidget);
 	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
-
 	//Set vertical layout as main layout
 	setLayout(verticalLayout);
 }
