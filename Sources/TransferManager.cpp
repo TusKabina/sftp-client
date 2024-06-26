@@ -51,7 +51,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
        std::cout << "JOB NOT FOUND" << std::endl;
        return;
    }
-    std::string localDirPath = (*job)->getLocalDirectoryPath();
+    std::string localDirPath = (*job)->getLocalDirectoryPath() + "/";
     (*job)->setTransferHandle(curl);
 
     if(job != m_transferJobs.end()) {
@@ -93,8 +93,8 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 (*job)->moveFile(m_url);
                 {
                    QMutexLocker locker(&m_mutex);
-                  /* m_DirectoryCache.refreshDirectory(localDirPath);
-                   m_DirectoryCache.refreshDirectory(remoteDirPath);*/
+                   m_DirectoryCache.refreshDirectory(localDirPath);
+                   m_DirectoryCache.refreshDirectory(remoteDirPath);
                 }
                 break;
             case JobOperation::DELETE:

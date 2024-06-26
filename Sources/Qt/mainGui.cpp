@@ -591,7 +591,7 @@ TreeViewWidget::TreeViewWidget() {
 	m_transferStatusWidget = new QTreeWidget(this);
 	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
 	m_transferStatusWidget->setColumnCount(7);
-	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "Direction" << "Source Path" << "Destination Path"
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
 		<< "Bytes Transferred" << "Speed" << "Progress");
 	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	m_transferStatusWidget->setSortingEnabled(true);
