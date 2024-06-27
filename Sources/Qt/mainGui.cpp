@@ -563,7 +563,9 @@ TreeViewWidget::TreeViewWidget() {
 	//Server password
 	m_sftpPasswordNameLabel = new QLabel("Password");
 	horizontalLayoutUserCredentials->addWidget(m_sftpPasswordNameLabel);
+
 	m_sftpPasswordNameLineEdit = new QLineEdit;
+	m_sftpPasswordNameLineEdit->setEchoMode(QLineEdit::Password);
 	horizontalLayoutUserCredentials->addWidget(m_sftpPasswordNameLineEdit);
 
 	//Connect/Disconnect button stuf
