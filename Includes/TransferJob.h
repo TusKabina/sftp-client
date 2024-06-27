@@ -6,6 +6,7 @@
 #include "UIDGenerator.h"
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include <utility>
 #include <qobject.h>
 #include <cstdio>

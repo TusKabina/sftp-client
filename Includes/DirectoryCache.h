@@ -7,6 +7,8 @@
 #include <map>
 #include <qobject.h>
 #include <qmutex.h>
+#include <iomanip>
+
 struct DirectoryEntry {
     std::string m_name;
     std::string m_lastModified;

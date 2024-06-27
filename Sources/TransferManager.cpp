@@ -91,7 +91,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                     std::string source = (*job)->getLocalDirectoryPath() + "/";
                     std::string sourceFileName = (*job)->getLocalPath().substr(source.size(), (*job)->getRemotePath().size());
                     uint64_t totalBytes = m_DirectoryCache.getTotalBytes(source, sourceFileName);
-                    (*job)->setFileTotalBytes(totalBytes * 2);
+                    (*job)->setFileTotalBytes(totalBytes);
                 }
                 (*job)->copyFile();
                 {

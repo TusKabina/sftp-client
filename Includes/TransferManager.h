@@ -18,7 +18,12 @@ class JobRunnable;
 class CurlThreadPool : public QThreadPool {
 public:
     CurlThreadPool() : QThreadPool() {
-        setMaxThreadCount(20);
+        unsigned int maxConcurrency = std::thread::hardware_concurrency();
+        if (maxConcurrency < 1) {
+            maxConcurrency = 20;
+        }
+        std::cout << "Initialized thread pool with: " << maxConcurrency << " number of threads\n";
+        setMaxThreadCount(static_cast<int>(maxConcurrency));
     }
 
     std::shared_ptr<CURL> getCurlForCurrentThread() {

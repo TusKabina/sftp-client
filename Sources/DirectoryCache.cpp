@@ -4,17 +4,17 @@
 #include <algorithm>
 
 std::string urlEncode(const std::string& url) {
-    std::string encoded;
-    char hex[4];
-    for (char c : url) {
-        if (c == ' ') {
-            encoded += "%20";
+    std::ostringstream encoded;
+    for (unsigned char c : url) {
+        // Encode all non-alphanumeric characters except for '-', '_', '.', and '~'
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/') {
+            encoded << c;
         }
         else {
-            encoded += c;
+            encoded << '%' << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << static_cast<int>(c);
         }
     }
-    return encoded;
+    return encoded.str();
 }
 
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
@@ -79,12 +79,13 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     if (!m_curlHandle.get()) {
         return entries;
     }
-    std::string fullUrl = m_baseUrl + path;
+    std::string encodedPath = urlEncode(path);
+    std::string fullUrl = m_baseUrl + encodedPath;
     std::string response;
-    std::string encodedUrl = urlEncode(fullUrl);
+   // std::string encodedUrl = urlEncode(fullUrl);
 
 
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, encodedUrl.c_str());
+    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
     curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
 
@@ -93,9 +94,11 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
         m_curlCode = static_cast<int>(res);
+        curl_easy_reset(m_curlHandle.get());
         return entries;
     }
     parseResponse(entries, response);
+    curl_easy_reset(m_curlHandle.get());
     return entries;
 }
 
@@ -173,6 +176,9 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
 
         name = name.substr(name.find_first_not_of(' '));
 
+        if (day.size() == 1) {
+            day = '0' + day;
+        }
         DirectoryEntry entry;
         entry.m_isDirectory = permissions[0] == 'd' ? true : false;
         entry.m_isSymLink = permissions[0] == 'l' ? true : false;

@@ -283,8 +283,13 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(1, QString::fromStdString(transferStatus.TransferStatetoString()));
 	item->setText(2, QString::fromStdString(transferStatus.m_source));
 	item->setText(3, QString::fromStdString(transferStatus.m_destination));
-	item->setText(4, QString::number(transferStatus.m_bytesTransferred) + "B");
-	item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
+	item->setText(4, QString::number(transferStatus.m_bytesTransferred));
+	if (transferStatus.m_progress >= 100) {
+		item->setText(5, "0.000 MB/S");
+	}
+	else {
+		item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
+	}
 	item->setText(6, QString::number(transferStatus.m_progress,'f',2) + " %");
 }
 
@@ -300,25 +305,41 @@ void TreeViewWidget::onPasteAction() {
 	QString destinationPath = m_textCommandParameterRemote;
 	if (m_isCutOperation) {
 		std::string sourcePath = "/" + m_sourcePath.toStdString();
-		std::string destPath = "/" + destinationPath.toStdString();
-		if (!m_manager.isRegularFile(destPath)) {
-			destPath = destPath + '/' + FileName(sourcePath);
+		if (!m_manager.isRegularFile(sourcePath)) {
+			m_textDebugLog.append("[MOVE] ERROR: source: /" + m_sourcePath + " is not a file!");
 		}
+		else {
+			std::string destPath = "/" + destinationPath.toStdString();
+			if (!m_manager.isRegularFile(destPath)) {
+				destPath = destPath + '/' + FileName(sourcePath);
+			}
+			else {
+				destPath = GetDirectoryName(destPath) + "/" + FileName(sourcePath);
+			}
+			m_textDebugLog.append(QString::fromStdString("[MOVE] Source: " + sourcePath + " Destination: " + destPath));
 
-		m_textDebugLog.append(QString::fromStdString("[MOVE] Source: " + sourcePath + " Destination: " + destPath));
-
-		uint64_t moveJobId = m_manager.prepareJob(sourcePath, destPath);
-		m_manager.submitJob(moveJobId, JobOperation::MOVE);
+			uint64_t moveJobId = m_manager.prepareJob(sourcePath, destPath);
+			m_manager.submitJob(moveJobId, JobOperation::MOVE);
+		}
 	}
 	else {
 		std::string sourcePath = "/" + m_sourcePath.toStdString();
-		std::string destPath = "/" + destinationPath.toStdString();
-		if (!m_manager.isRegularFile(destPath)) {
-			destPath = destPath + '/' + FileName(sourcePath);
+		if (!m_manager.isRegularFile(sourcePath)) {
+			m_textDebugLog.append("[COPY] ERROR: source: /" + m_sourcePath + " is not a file!");
 		}
-		m_textDebugLog.append(QString::fromStdString("[COPY] Source: " + sourcePath + " Destination: " + destPath));
-		uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
-		m_manager.submitJob(copyJobId, JobOperation::COPY);
+		else {
+			std::string destPath = "/" + destinationPath.toStdString();
+			if (!m_manager.isRegularFile(destPath)) {
+				destPath = destPath + '/' + FileName(sourcePath);
+			}
+			else {
+				destPath = GetDirectoryName(destPath) + "/" + FileName(sourcePath);
+			}
+			m_textDebugLog.append(QString::fromStdString("[COPY] Source: " + sourcePath + " Destination: " + destPath));
+			uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
+			m_manager.submitJob(copyJobId, JobOperation::COPY);
+
+		}
 	}
 	m_sourcePath.clear();
 	m_isCutOperation = false;
@@ -744,45 +765,51 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 	}
 
 	if (!currentItem) {
-		m_textDebugLog.append("The starting path was not found in the tree.");
+		m_textDebugLog.append("The starting path for: " + path +" was not found in the tree.");
 		return;
 	}
 
-	QString currentPath = pathParts[0];
-	std::string strCurrentPath = pathParts[0].toStdString();
-	
-	for (int i = 1; i < pathParts.size(); ++i) {
-		bool found = false;
-		currentPath += "/" + pathParts[i];
-		strCurrentPath = currentPath.toStdString();
-		for (int j = 0; j < currentItem->childCount(); ++j) {
-			QTreeWidgetItem* child = currentItem->child(j);
-			std::string strChildText = child->text(0).toStdString();
-			std::string strParts = pathParts[i].toStdString();
-			if (child->text(0) == pathParts[i]) {
-				currentItem = child;
-				found = true;
-				break;
-			}
-		}
+	if (pathParts.size() == 1) {
+		currentItem->setExpanded(true);
+		m_treeWidget->scrollToItem(currentItem);
+	}
+	else {
+		QString currentPath = pathParts[0];
+		std::string strCurrentPath = pathParts[0].toStdString();
 
-		if (!found || !currentItem->data(0, Qt::UserRole + 1).toBool()) {
-			populateTreeWidgetViewDirectory(currentItem, currentPath);
+		for (int i = 1; i < pathParts.size(); ++i) {
+			bool found = false;
+			currentPath += "/" + pathParts[i];
+			strCurrentPath = currentPath.toStdString();
 			for (int j = 0; j < currentItem->childCount(); ++j) {
 				QTreeWidgetItem* child = currentItem->child(j);
+				std::string strChildText = child->text(0).toStdString();
+				std::string strParts = pathParts[i].toStdString();
 				if (child->text(0) == pathParts[i]) {
 					currentItem = child;
 					found = true;
 					break;
 				}
 			}
-			if (!found) {
-				m_textDebugLog.append("The path " + currentPath + " was not found in the tree.");
-				return;
+
+			if (!found || !currentItem->data(0, Qt::UserRole + 1).toBool()) {
+				populateTreeWidgetViewDirectory(currentItem, currentPath);
+				for (int j = 0; j < currentItem->childCount(); ++j) {
+					QTreeWidgetItem* child = currentItem->child(j);
+					if (child->text(0) == pathParts[i]) {
+						currentItem = child;
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					m_textDebugLog.append("The path " + currentPath + " was not found in the tree.");
+					return;
+				}
 			}
+			currentItem->setExpanded(true);
+			m_treeWidget->scrollToItem(currentItem);
 		}
-		currentItem->setExpanded(true);
-		m_treeWidget->scrollToItem(currentItem);
 	}
 
 }
