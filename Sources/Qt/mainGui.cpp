@@ -431,6 +431,7 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 	QAction* Pdelete = menu.addAction(trUtf8("Delete"));
 	QAction* pCopy = menu.addAction(trUtf8("Copy"));
 	QAction* pCut = menu.addAction(trUtf8("Cut"));
+	QAction* pRefresh = menu.addAction(trUtf8("Refresh"));
 
 	if (!m_sourcePath.isEmpty()) {
 		QAction* pPaste = menu.addAction(trUtf8("Paste"));
@@ -486,6 +487,9 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 			m_textDebugLog.append("[Delete] Local directory: " + m_textCommandParameterRemote);
 		}
 		//TODO
+	}
+	else if (pSelected == pRefresh) {
+		std::string strPath = m_directoryNameRemote.toStdString();
 	}
 }
 
@@ -633,11 +637,13 @@ void TreeViewWidget::populateTreeView() {
 		std::string pathInPopulate = path.toStdString();
 		const auto& entries = pair.second;
 		QTreeWidgetItem* root = findOrCreateRoot(path);
+
 		for (const auto& entry : entries) {
 			auto& strEntry = entry.m_name;
 			if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 				continue;
 			}
+
 			QDateTime dateTime = parseDateString(entry.m_lastModified);
 			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 			
@@ -796,7 +802,7 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 
 			if (!found || !currentItem->data(0, Qt::UserRole + 1).toBool()) {
 				populateTreeWidgetViewDirectory(currentItem, currentPath);
-				for (int j = 0; j < currentItem->childCount(); ++j) {
+				for (int j = 0; j < currentItem->childCount(); j++) {
 					QTreeWidgetItem* child = currentItem->child(j);
 					if (child->text(0) == pathParts[i]) {
 						currentItem = child;
