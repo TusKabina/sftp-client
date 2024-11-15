@@ -69,3 +69,4 @@ cmake-build-debug/CMakeFiles/3.28.1/CompilerIdCXX/CMakeCXXCompilerId.cpp
 cmake-build-debug/Testing/Temporary/LastTest.log
 CMakeFiles/cmake.check_cache
 CMakeSettings.json
+/CMakeUserPresets.json
