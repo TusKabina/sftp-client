@@ -970,9 +970,10 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 }
 
 void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {
+	// Disable updates to improve performance
 	m_treeWidget->setUpdatesEnabled(false);
 
-	// Construct the full path efficiently
+	// Avoid unnecessary string conversions
 	QString fullPath = '/' + path + '/';
 	const auto entries = m_manager.getDirectoryList(fullPath.toStdString());
 	if (entries.empty()) {
@@ -980,34 +981,77 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 		return;
 	}
 
+	// Create a hash for existing items under root for quick lookup
+	QHash<QString, QTreeWidgetItem*> existingItems;
+	for (int i = 0; i < root->childCount(); ++i) {
+		QTreeWidgetItem* child = root->child(i);
+		existingItems.insert(child->text(0), child);
+	}
+
+	// Keep track of items that need to remain
+	QSet<QString> newItems;
+
 	for (const auto& entry : entries) {
 		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 			continue;
 		}
 
 		QString entryName = QString::fromStdString(entry.m_name);
+		newItems.insert(entryName);
 
-		QTreeWidgetItem* item = new QTreeWidgetItem(root);
-		item->setText(0, entryName);
-		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
+		if (!item) {
+			// Create new item if it doesn't exist
+			item = new QTreeWidgetItem(root);
+			item->setText(0, entryName);
+			root->addChild(item);
+		}
 
+		// Update item's properties if necessary
+		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		if (item->text(2) != typeText) {
+			item->setText(2, typeText);
+		}
+
+		// Update date
 		QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
-		item->setText(3, formattedDate);
-
-		if (entry.m_isDirectory) {
-			item->setIcon(0, getDirectoryIcon());
-			item->setData(0, Qt::UserRole, true);
+		if (item->text(3) != formattedDate) {
+			item->setText(3, formattedDate);
 		}
-		else {
-			item->setIcon(0, getFileIcon());
-			item->setData(0, Qt::UserRole, false);
-			item->setText(1, convertSize(entry.m_totalBytes));
+
+		// Update icon if necessary
+		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
+		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
+			item->setIcon(0, desiredIcon);
+		}
+
+		// Update data
+		QVariant currentData = item->data(0, Qt::UserRole);
+		bool desiredData = entry.m_isDirectory;
+		if (currentData.toBool() != desiredData) {
+			item->setData(0, Qt::UserRole, desiredData);
+		}
+
+		// Update size for files
+		if (!entry.m_isDirectory) {
+			QString sizeText = convertSize(entry.m_totalBytes);
+			if (item->text(1) != sizeText) {
+				item->setText(1, sizeText);
+			}
+		}
+	}
+
+	// Remove items that are no longer present
+	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
+		if (!newItems.contains(it.key())) {
+			delete it.value();
 		}
 	}
 
 	root->setData(0, Qt::UserRole + 1, true);
 
+	// Re-enable updates
 	m_treeWidget->setUpdatesEnabled(true);
 }
 
