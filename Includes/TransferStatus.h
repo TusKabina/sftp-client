@@ -42,6 +42,7 @@ struct TransferStatus {
 
     TransferStatus();
     void updateSpeed(size_t bytesTransferred);
+    void reset();
     const std::string TransferStatetoString() const;
 };
 inline std::ostream& operator<<(std::ostream& os, TransferStatus::TransferState state);

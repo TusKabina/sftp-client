@@ -47,6 +47,8 @@ public:
     void updateDirectoryCache(const std::string& path, int depth);
     void refreshDirectory(const std::string& path);
 
+    void reset();
+
     ~DirectoryCache() {}
 
 private:

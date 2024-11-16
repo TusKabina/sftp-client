@@ -225,7 +225,34 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 	event->accept();
 }
 
+void deleteTreeItems(QTreeWidgetItem* item) {
+	// Loop through all the child items
+	for (int i = 0; i < item->childCount(); ++i) {
+		// Recursively delete each child item
+		deleteTreeItems(item->child(i));
+	}
+	// Delete the current item itself
+	delete item;
+}
+
 void TreeViewWidget::onConnectButtonClicked() {
+	if (m_isConnected) {
+		m_manager.reset();
+
+		for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
+			QTreeWidgetItem* topLevelItem = m_treeWidget->topLevelItem(i);
+			deleteTreeItems(topLevelItem);  // Recursively delete all items (top-level + subdirectories)
+		}
+
+		m_treeWidget->clear();
+		m_isConnected = false;
+		m_textDebugLog.append("Disconnected");
+		m_connectDisconnectButton->setText("Connect");
+		m_remoteFileToUploadLineEdit->clear();
+		m_remoteFolderLineEdit->clear();
+		return;
+	}
+
 	std::string host = m_sftpServerNameLineEdit->text().toStdString();
 	std::string username = m_sftpUserNameLineEdit->text().toStdString();
 	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();

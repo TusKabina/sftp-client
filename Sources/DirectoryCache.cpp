@@ -154,6 +154,14 @@ void DirectoryCache::refreshDirectory(const std::string& path) {
     emit onDirectoryUpdated(path);
 }
 
+void DirectoryCache::reset() {
+    m_curlHandle.reset();
+    m_curlCode = 0;
+    m_baseUrl = "";
+    m_cache.clear();
+    m_initialized = false;
+}
+
 size_t DirectoryCache::writeCallback(void* buffer, size_t size, size_t nmemb, std::string& response) {
 	response.append(static_cast<char*>(buffer), size * nmemb);
 	return size * nmemb;

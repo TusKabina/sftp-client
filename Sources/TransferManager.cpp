@@ -147,6 +147,30 @@ TransferHandle &TransferManager::findFreeHandle() {
     }
 }
 
+void TransferManager::reset() {
+
+    m_DirectoryCache.reset();
+
+    for (auto& handle : m_transferHandles) {
+        handle.m_curlHandle.reset();
+        handle.m_transferStatus.reset();
+    }
+
+    for (TransferJob* job : m_transferJobs) {
+        delete job;
+    }
+
+    m_transferJobs.clear();
+    m_username = "";
+    m_password = "";
+    m_url = "";
+    m_maxHandlesNumber = 0;
+    m_handleCounter = 0;
+    m_initialized = false;
+
+   // m_threadPool.cleanup();
+}
+
 const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::string &path) {
     std::vector<DirectoryEntry> entries;
     if (!m_DirectoryCache.isPathInCache(path)) {

@@ -15,7 +15,6 @@
 #include <QString>
 #include <QVBoxLayout>
 #include <QtWidgets/qfilesystemmodel.h>
-#include "WorkerThread.h"
 #include "ThreadPool.h"
 #include "TransferManager.h"
 #include <qdrag.h>
@@ -115,7 +114,6 @@ private:
 
 	QTextEdit m_textDebugLog;
 
-	bool m_isConnected = false;
 
 	TransferManager m_manager;
 
@@ -126,6 +124,7 @@ private:
 
 	QString m_sourcePath;
 	bool m_isCutOperation;
+	bool m_isConnected = false;
 };
 
 #endif // SFTP_CLIENT_MAINGUI_H
