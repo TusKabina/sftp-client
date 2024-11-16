@@ -127,7 +127,7 @@ private:
 	bool m_isCutOperation;
 	bool m_isConnected = false;
 
-	static QIcon& getFolderIcon();
+	static QIcon& getDirectoryIcon();
 	static QIcon& getFileIcon();
 };
 

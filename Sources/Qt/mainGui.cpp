@@ -970,37 +970,45 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 }
 
 void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {
-	std::string fullPath = '/' + path.toStdString() + '/';
-	const auto entries = m_manager.getDirectoryList(fullPath);
+	m_treeWidget->setUpdatesEnabled(false);
+
+	// Construct the full path efficiently
+	QString fullPath = '/' + path + '/';
+	const auto entries = m_manager.getDirectoryList(fullPath.toStdString());
 	if (entries.empty()) {
+		m_treeWidget->setUpdatesEnabled(true);
 		return;
 	}
+
 	for (const auto& entry : entries) {
 		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
 			continue;
 		}
 
+		QString entryName = QString::fromStdString(entry.m_name);
+
+		QTreeWidgetItem* item = new QTreeWidgetItem(root);
+		item->setText(0, entryName);
+		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+
 		QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
-
-		QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(QString::fromStdString(entry.m_name)));
-		item->setText(0, QString::fromStdString(entry.m_name));
-		item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 		item->setText(3, formattedDate);
 
 		if (entry.m_isDirectory) {
-			item->setIcon(0, QPixmap("dir.png"));
+			item->setIcon(0, getDirectoryIcon());
 			item->setData(0, Qt::UserRole, true);
 		}
 		else {
-			item->setIcon(0, QPixmap("file.png"));
+			item->setIcon(0, getFileIcon());
 			item->setData(0, Qt::UserRole, false);
 			item->setText(1, convertSize(entry.m_totalBytes));
 		}
-
-		root->addChild(item);
 	}
+
 	root->setData(0, Qt::UserRole + 1, true);
+
+	m_treeWidget->setUpdatesEnabled(true);
 }
 
 QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
