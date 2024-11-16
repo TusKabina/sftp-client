@@ -22,6 +22,7 @@
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QMimeData>
+#include <QIcon>
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -125,6 +126,9 @@ private:
 	QString m_sourcePath;
 	bool m_isCutOperation;
 	bool m_isConnected = false;
+
+	static QIcon& getFolderIcon();
+	static QIcon& getFileIcon();
 };
 
 #endif // SFTP_CLIENT_MAINGUI_H
