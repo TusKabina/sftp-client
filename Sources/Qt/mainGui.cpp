@@ -5,7 +5,7 @@
 #include <filesystem>
 #include "Qt/mainGui.h"
 #include "Utilities/MeasureHelper.h"
-
+#include "Utilities/Logger.h"
 QIcon& TreeViewWidget::getDirectoryIcon() {
 	static QIcon directoryIcon("dir.png");
 	return directoryIcon;
@@ -136,7 +136,7 @@ void TreeView::dropEvent(QDropEvent* event) {
 	event->accept();
 }
 
-TreeWidget::TreeWidget(QWidget* parent) : QTreeWidget(parent){
+TreeWidget::TreeWidget(QWidget* parent) : QTreeWidget(parent) {
 }
 
 void TreeWidget::mousePressEvent(QMouseEvent* event) {
@@ -235,9 +235,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 }
 
 void deleteTreeItems(QTreeWidgetItem* item) {
-	// Loop through all the child items
 	for (int i = 0; i < item->childCount(); ++i) {
-		// Recursively delete each child item
 		deleteTreeItems(item->child(i));
 	}
 	// Delete the current item itself
@@ -245,12 +243,13 @@ void deleteTreeItems(QTreeWidgetItem* item) {
 }
 
 void TreeViewWidget::onConnectButtonClicked() {
+	Logger::instance().setLogWidget(&m_textDebugLog);
 	if (m_isConnected) {
 		m_manager.reset();
 
 		for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
 			QTreeWidgetItem* topLevelItem = m_treeWidget->topLevelItem(i);
-			deleteTreeItems(topLevelItem);  // Recursively delete all items (top-level + subdirectories)
+			deleteTreeItems(topLevelItem);
 		}
 
 		m_treeWidget->clear();
@@ -270,12 +269,21 @@ void TreeViewWidget::onConnectButtonClicked() {
 	m_isConnected = m_manager.isInitialized();
 
 	if (m_isConnected) {
-		m_textDebugLog.append("Connected");
+		//m_textDebugLog.append("Connected");
+		logger().info() << "Connected";
+
+		long long b = 1234351;
+		logger().info() << b << " nesto u meni";
+		logger().debug() << "This is debug log!";
+		logger().info() << " This is info log!";
+		logger().warning() << "This is warning log!";
+		logger().error() << "This is error log!";
 		m_connectDisconnectButton->setText("Disconnect");
 		populateTreeView();
 	}
 	else {
-		m_textDebugLog.append("Disconnected");
+		//m_textDebugLog.append("Disconnected");
+		logger().info() << "Disconnected";
 		m_connectDisconnectButton->setText("Connect");
 	}
 }
@@ -320,8 +328,9 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(2, QString::fromStdString(transferStatus.m_source));
 	item->setText(3, QString::fromStdString(transferStatus.m_destination));
 	item->setText(4, QString::number(transferStatus.m_bytesTransferred));
+
 	if (transferStatus.m_progress >= 100) {
-		item->setText(5, "0.000 MB/S");
+		item->setText(5, "0.000 MB/s");
 	}
 	else {
 		item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
@@ -399,13 +408,18 @@ void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 
 void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int index) {
 	QString fullPath = item->text(0);
+	QString entryType = item->text(2);
+
+	std::cout << "item->text(0): " << item->text(0).toStdString() << std::endl;
+	std::cout << "Entry Type: " << entryType.toStdString() << std::endl;
 	bool prefetch = (item->childCount() == 0);
 
 	while (item->parent() != NULL) {
 		fullPath = item->parent()->text(0) + "/" + fullPath;
 		item = item->parent();
 	}
-	if (prefetch) {
+
+	if (prefetch && entryType == "Folder") {
 		updateTreeView("/" + fullPath.toStdString() + "/");
 	}
 		
@@ -704,16 +718,9 @@ void TreeViewWidget::populateTreeView() {
 }
 
 void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
-	auto logDuration = [](const std::string& section, auto start, auto end) {
-		std::cout << section << " took: "
-			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-			<< " ms" << std::endl;
-	};
-
 	m_treeWidget->setUpdatesEnabled(false);
 	auto startOverall = std::chrono::high_resolution_clock::now();
 
-	// Measure findOrCreateRoot
 	auto start = std::chrono::high_resolution_clock::now();
 	QString qPath = QString::fromStdString(path);
 	QTreeWidgetItem* root = findOrCreateRoot(qPath);
@@ -722,15 +729,13 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		return;
 	}
 	auto end = std::chrono::high_resolution_clock::now();
-	logDuration("findOrCreateRoot", start, end);
+	MeasureHelper::logDuration("findOrCreateRoot", start, end);
 
-	// Measure m_manager.getDirectoryList
 	start = std::chrono::high_resolution_clock::now();
 	const auto entries = m_manager.getDirectoryList(path);
 	end = std::chrono::high_resolution_clock::now();
-	logDuration("m_manager.getDirectoryList", start, end);
+	MeasureHelper::logDuration("m_manager.getDirectoryList", start, end);
 
-	// Use QHash for faster lookups
 	start = std::chrono::high_resolution_clock::now();
 	QHash<QString, QTreeWidgetItem*> existingItems;
 	for (int i = 0; i < root->childCount(); ++i) {
@@ -738,9 +743,8 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		existingItems.insert(child->text(0), child);
 	}
 	end = std::chrono::high_resolution_clock::now();
-	logDuration("Creating existing items hash", start, end);
+	MeasureHelper::logDuration("Creating existing items hash", start, end);
 
-	// Add or update items based on the directory entries
 	start = std::chrono::high_resolution_clock::now();
 	QSet<QString> newItems;
 	for (const auto& entry : entries) {
@@ -753,32 +757,27 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 
 		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
 		if (!item) {
-			// Create new item if it doesn't exist
 			item = new QTreeWidgetItem(root);
 			root->addChild(item);
 			item->setText(0, entryName);
 		}
 		else {
-			// Existing item - check if updates are needed
 			if (item->text(0) != entryName) {
 				item->setText(0, entryName);
 			}
 		}
 
-		// Set text for column 2 if necessary
 		QString typeText = entry.m_isDirectory ? "Folder" : "File";
 		if (item->text(2) != typeText) {
 			item->setText(2, typeText);
 		}
 
-		// Set date if necessary
 		QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
 		}
 
-		// Set icon and data if necessary
 		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
 		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
 			item->setIcon(0, desiredIcon);
@@ -790,7 +789,6 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 			item->setData(0, Qt::UserRole, desiredData);
 		}
 
-		// For files, update size if necessary
 		if (!entry.m_isDirectory) {
 			QString sizeText = convertSize(entry.m_totalBytes);
 			if (item->text(1) != sizeText) {
@@ -799,9 +797,8 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		}
 	}
 	end = std::chrono::high_resolution_clock::now();
-	logDuration("Adding/updating items", start, end);
+	MeasureHelper::logDuration("Adding/updating items", start, end);
 
-	// Remove items that no longer exist in the directory
 	start = std::chrono::high_resolution_clock::now();
 	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
 		if (!newItems.contains(it.key())) {
@@ -809,15 +806,14 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		}
 	}
 	end = std::chrono::high_resolution_clock::now();
-	logDuration("Removing non-existent items", start, end);
+	MeasureHelper::logDuration("Removing non-existent items", start, end);
 
 	m_treeWidget->setUpdatesEnabled(true);
 	auto endOverall = std::chrono::high_resolution_clock::now();
-	logDuration("Overall refreshTreeViewRoot", startOverall, endOverall);
+	MeasureHelper::logDuration("Overall refreshTreeViewRoot", startOverall, endOverall);
 }
 
 void TreeViewWidget::updateTreeView(const std::string& path) {
-	// Disable updates to improve performance
 	m_treeWidget->setUpdatesEnabled(false);
 
 	const auto entries = m_manager.getDirectoryList(path);
@@ -833,14 +829,12 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		return;
 	}
 
-	// Create a hash for existing items under root for quick lookup
 	QHash<QString, QTreeWidgetItem*> existingItems;
 	for (int i = 0; i < root->childCount(); ++i) {
 		QTreeWidgetItem* child = root->child(i);
 		existingItems.insert(child->text(0), child);
 	}
 
-	// Keep track of items that need to remain
 	QSet<QString> newItems;
 
 	for (const auto& entry : entries) {
@@ -853,26 +847,22 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 
 		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
 		if (!item) {
-			// Create new item if it doesn't exist
 			item = new QTreeWidgetItem(root);
 			item->setText(0, entryName);
 			root->addChild(item);
 		}
 
-		// Update item's properties if necessary
 		QString typeText = entry.m_isDirectory ? "Folder" : "File";
 		if (item->text(2) != typeText) {
 			item->setText(2, typeText);
 		}
 
-		// Update date
 		QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
 		}
 
-		// Update size for files
 		if (!entry.m_isDirectory) {
 			QString sizeText = convertSize(entry.m_totalBytes);
 			if (item->text(1) != sizeText) {
@@ -880,13 +870,11 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 			}
 		}
 
-		// Update icon if necessary
 		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
 		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
 			item->setIcon(0, desiredIcon);
 		}
 
-		// Update data
 		QVariant currentData = item->data(0, Qt::UserRole);
 		bool desiredData = entry.m_isDirectory;
 		if (currentData.toBool() != desiredData) {
@@ -894,21 +882,132 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		}
 	}
 
-	// Remove items that are no longer present
 	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
 		if (!newItems.contains(it.key())) {
 			delete it.value();
 		}
 	}
 
-	// Re-enable updates
 	m_treeWidget->setUpdatesEnabled(true);
+}
+
+void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {
+	m_treeWidget->setUpdatesEnabled(false);
+
+	QString fullPath = '/' + path + '/';
+	const auto entries = m_manager.getDirectoryList(fullPath.toStdString());
+	if (entries.empty()) {
+		m_treeWidget->setUpdatesEnabled(true);
+		return;
+	}
+
+	QHash<QString, QTreeWidgetItem*> existingItems;
+	for (int i = 0; i < root->childCount(); ++i) {
+		QTreeWidgetItem* child = root->child(i);
+		existingItems.insert(child->text(0), child);
+	}
+
+	QSet<QString> newItems;
+
+	for (const auto& entry : entries) {
+		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+			continue;
+		}
+
+		QString entryName = QString::fromStdString(entry.m_name);
+		newItems.insert(entryName);
+
+		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
+		if (!item) {
+			item = new QTreeWidgetItem(root);
+			item->setText(0, entryName);
+			root->addChild(item);
+		}
+
+		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		if (item->text(2) != typeText) {
+			item->setText(2, typeText);
+		}
+
+		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
+		if (item->text(3) != formattedDate) {
+			item->setText(3, formattedDate);
+		}
+
+		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
+		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
+			item->setIcon(0, desiredIcon);
+		}
+
+		QVariant currentData = item->data(0, Qt::UserRole);
+		bool desiredData = entry.m_isDirectory;
+		if (currentData.toBool() != desiredData) {
+			item->setData(0, Qt::UserRole, desiredData);
+		}
+
+		if (!entry.m_isDirectory) {
+			QString sizeText = convertSize(entry.m_totalBytes);
+			if (item->text(1) != sizeText) {
+				item->setText(1, sizeText);
+			}
+		}
+	}
+
+	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
+		if (!newItems.contains(it.key())) {
+			delete it.value();
+		}
+	}
+
+	root->setData(0, Qt::UserRole + 1, true);
+
+	m_treeWidget->setUpdatesEnabled(true);
+}
+
+QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
+	QStringList parts = path.split('/', QString::SkipEmptyParts);
+	auto strPath = path.toStdString();
+	QTreeWidgetItem* root = nullptr;
+
+	for (const auto& part : parts) {
+		bool found = false;
+		if (!root) {
+			for (int i = 0; i < m_treeWidget->topLevelItemCount(); i++) {
+				if (m_treeWidget->topLevelItem(i)->text(0) == part) {
+					root = m_treeWidget->topLevelItem(i);
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				root = new QTreeWidgetItem(QStringList(part));
+				m_treeWidget->addTopLevelItem(root);
+			}
+		}
+		else {
+			for (int i = 0; i < root->childCount(); i++) {
+				if (root->child(i)->text(0) == part) {
+					root = root->child(i);
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(part));
+				root->addChild(child);
+				root = child;
+			}
+		}
+		
+	}
+	return root ? root : m_treeWidget->invisibleRootItem();
 }
 
 void TreeViewWidget::findAndExpandPath(const QString& path) {
 	QStringList pathParts = path.split("/", Qt::SkipEmptyParts);
 	QTreeWidgetItem* currentItem = nullptr;
-	
+
 	for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
 		QTreeWidgetItem* item = m_treeWidget->topLevelItem(i);
 		std::string strItemText = item->text(0).toStdString();
@@ -920,7 +1019,7 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 	}
 
 	if (!currentItem) {
-		m_textDebugLog.append("The starting path for: " + path +" was not found in the tree.");
+		m_textDebugLog.append("The starting path for: " + path + " was not found in the tree.");
 		return;
 	}
 
@@ -966,130 +1065,5 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 			m_treeWidget->scrollToItem(currentItem);
 		}
 	}
-
 }
 
-void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {
-	// Disable updates to improve performance
-	m_treeWidget->setUpdatesEnabled(false);
-
-	// Avoid unnecessary string conversions
-	QString fullPath = '/' + path + '/';
-	const auto entries = m_manager.getDirectoryList(fullPath.toStdString());
-	if (entries.empty()) {
-		m_treeWidget->setUpdatesEnabled(true);
-		return;
-	}
-
-	// Create a hash for existing items under root for quick lookup
-	QHash<QString, QTreeWidgetItem*> existingItems;
-	for (int i = 0; i < root->childCount(); ++i) {
-		QTreeWidgetItem* child = root->child(i);
-		existingItems.insert(child->text(0), child);
-	}
-
-	// Keep track of items that need to remain
-	QSet<QString> newItems;
-
-	for (const auto& entry : entries) {
-		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
-			continue;
-		}
-
-		QString entryName = QString::fromStdString(entry.m_name);
-		newItems.insert(entryName);
-
-		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
-		if (!item) {
-			// Create new item if it doesn't exist
-			item = new QTreeWidgetItem(root);
-			item->setText(0, entryName);
-			root->addChild(item);
-		}
-
-		// Update item's properties if necessary
-		QString typeText = entry.m_isDirectory ? "Folder" : "File";
-		if (item->text(2) != typeText) {
-			item->setText(2, typeText);
-		}
-
-		// Update date
-		QDateTime dateTime = parseDateString(entry.m_lastModified);
-		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
-		if (item->text(3) != formattedDate) {
-			item->setText(3, formattedDate);
-		}
-
-		// Update icon if necessary
-		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
-		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
-			item->setIcon(0, desiredIcon);
-		}
-
-		// Update data
-		QVariant currentData = item->data(0, Qt::UserRole);
-		bool desiredData = entry.m_isDirectory;
-		if (currentData.toBool() != desiredData) {
-			item->setData(0, Qt::UserRole, desiredData);
-		}
-
-		// Update size for files
-		if (!entry.m_isDirectory) {
-			QString sizeText = convertSize(entry.m_totalBytes);
-			if (item->text(1) != sizeText) {
-				item->setText(1, sizeText);
-			}
-		}
-	}
-
-	// Remove items that are no longer present
-	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
-		if (!newItems.contains(it.key())) {
-			delete it.value();
-		}
-	}
-
-	root->setData(0, Qt::UserRole + 1, true);
-
-	// Re-enable updates
-	m_treeWidget->setUpdatesEnabled(true);
-}
-
-QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
-	QStringList parts = path.split('/', QString::SkipEmptyParts);
-	auto strPath = path.toStdString();
-	QTreeWidgetItem* root = nullptr;
-
-	for (const auto& part : parts) {
-		bool found = false;
-		if (!root) {
-			for (int i = 0; i < m_treeWidget->topLevelItemCount(); i++) {
-				if (m_treeWidget->topLevelItem(i)->text(0) == part) {
-					root = m_treeWidget->topLevelItem(i);
-					found = true;
-					break;
-				}
-			}
-			if (!found) {
-				root = new QTreeWidgetItem(QStringList(part));
-				m_treeWidget->addTopLevelItem(root);
-			}
-		}
-		else {
-			for (int i = 0; i < root->childCount(); i++) {
-				if (root->child(i)->text(0) == part) {
-					root = root->child(i);
-					found = true;
-					break;
-				}
-			}
-			if (!found) {
-				QTreeWidgetItem* child = new QTreeWidgetItem(QStringList(part));
-				root->addChild(child);
-				root = child;
-			}
-		}
-		
-	}
-	return root ? root : m_treeWidget->invisibleRootItem();
-}

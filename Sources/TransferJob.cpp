@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <cstdio>
+#include "Utilities/Logger.h"
 
 std::string urlEncoder(const std::string& url) {
     std::ostringstream encoded;
@@ -138,6 +139,7 @@ void TransferJob::uploadFile(const std::string& url) {
             m_transferHandle.m_transferStatus.m_errorMessage = "[UPLOAD] Error Message: Curl easy perform error: " + std::string(curl_easy_strerror(res));
             std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << m_transferHandle.m_transferStatus.m_errorMessage << "\n";
             onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
+           
         }
         else {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;

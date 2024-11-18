@@ -2,7 +2,7 @@
 #include <iostream> //TODO: DELETE
 #include <sstream>
 #include <algorithm>
-
+#include "Utilities/Logger.h"
 std::string urlEncode(const std::string& url) {
     std::ostringstream encoded;
     for (unsigned char c : url) {
@@ -93,6 +93,7 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
 
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
+        //logger().error() << curl_easy_strerror(res) << ": " << path;
         m_curlCode = static_cast<int>(res);
         curl_easy_reset(m_curlHandle.get());
         return entries;

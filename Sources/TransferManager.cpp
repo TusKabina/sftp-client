@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <QFileInfo>
 #include <qstring.h>
+
 void TransferManager::setCredentials(const std::string& host, const std::string& username, const std::string& password) {
     m_url = "sftp://" + username + ":" + password + "@" + host;
     m_username = username;
@@ -148,7 +149,6 @@ TransferHandle &TransferManager::findFreeHandle() {
 }
 
 void TransferManager::reset() {
-
     m_DirectoryCache.reset();
 
     for (auto& handle : m_transferHandles) {
