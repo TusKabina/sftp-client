@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include "Utilities/Logger.h"
+
 std::string urlEncode(const std::string& url) {
     std::ostringstream encoded;
     for (unsigned char c : url) {
@@ -34,6 +35,7 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
         if (res != 0) {
             m_curlCode = static_cast<int>(res);
             m_initialized = false;
+            logger().error() << std::string(curl_easy_strerror(res));
         }
         else {
             m_initialized = true;
@@ -48,6 +50,7 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
 
 
 void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
+    logger().debug() << "Pre fetching directory: " << path;
     if (depth == 0) {
         return;
     }
@@ -94,10 +97,13 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
         //logger().error() << curl_easy_strerror(res) << ": " << path;
-        logger().info() << "Failed to open Directory. Source: '" << path << "'. Error: " << std::string(curl_easy_strerror(res));
+        logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
         m_curlCode = static_cast<int>(res);
         curl_easy_reset(m_curlHandle.get());
         return entries;
+    }
+    else {
+        logger().debug() << "Directory listing of: " << path << " Successful.";
     }
     parseResponse(entries, response);
     curl_easy_reset(m_curlHandle.get());

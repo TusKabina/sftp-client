@@ -266,6 +266,9 @@ void TreeViewWidget::onConnectButtonClicked() {
 	std::string username = m_sftpUserNameLineEdit->text().toStdString();
 	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();
 
+	logger().info() << "Connecting to host: " << host;
+	logger().info() << "Username: " << username;
+
 	m_manager.connect(host, username, password);
 	m_isConnected = m_manager.isInitialized();
 
@@ -388,6 +391,10 @@ void TreeViewWidget::onPasteAction() {
 	m_sourcePath.clear();
 	m_isCutOperation = false;
 }
+void TreeViewWidget::onLogLevelChanged(int index) {
+	int selectedLogLevel = m_logLevelComboBox->currentData().toInt();
+	Logger::instance().setLogLevel(static_cast<LogLevel>(selectedLogLevel));
+}
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_textCommandParameterLocal = ((QFileSystemModel*)m_treeView->model())->filePath(index);
@@ -416,7 +423,9 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 	}
 
 	if (prefetch && entryType == "Folder") {
+		logger().info() << "Expanding Directory: /" << fullPath.toStdString();
 		updateTreeView("/" + fullPath.toStdString() + "/");
+		logger().info() << "Expanding Directory successful";
 	}
 		
 	std::string newPath = fullPath.toStdString();
@@ -447,8 +456,9 @@ void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 		std::string localPath  = m_textCommandParameterLocal.toStdString();
 		std::string directoryNameRemote = m_directoryNameRemote.toStdString() + "/test123.test";
 		if (std::filesystem::is_regular_file(p)) {
-			m_textDebugLog.append("[UPLOAD]: " + m_textCommandParameterLocal);
-			m_textDebugLog.append("[UPLOAD] Remote directory: " + m_directoryNameRemote);
+			/*m_textDebugLog.append("[UPLOAD]: " + m_textCommandParameterLocal);
+			m_textDebugLog.append("[UPLOAD] Remote directory: " + m_directoryNameRemote);*/
+
 			logger().info() << "started upload operation. Local path: '" << localPath
 							<< "'. Remote Path: " << directoryNameRemote;
 		}
@@ -608,28 +618,44 @@ TreeViewWidget::TreeViewWidget() {
 
 	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
 	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
-		this->onDirectoryCacheUpdated(path);
+			this->onDirectoryCacheUpdated(path);
 		});
+
 
 	//Basic layout for widgets
 	QHBoxLayout* horizontalLayoutUserCredentials = new QHBoxLayout;
 	QHBoxLayout* horizontalLayoutUploadDownloadParameters = new QHBoxLayout;
 	QHBoxLayout* horizontalLayoutTreeView = new QHBoxLayout;
+	QHBoxLayout* horizontalLogLevelLayout = new QHBoxLayout();
 	QVBoxLayout* verticalLayout = new QVBoxLayout;
 
-	//Server name
+	QLabel* logLevelLabel = new QLabel("Log Level:", this);
+	horizontalLogLevelLayout->addWidget(logLevelLabel);
+
+	// ComboBox
+	m_logLevelComboBox = new QComboBox(this);
+	m_logLevelComboBox->addItem("Debug", QVariant::fromValue(Debug));
+	m_logLevelComboBox->addItem("Info", QVariant::fromValue(Info));
+	m_logLevelComboBox->addItem("Warning", QVariant::fromValue(Warning));
+	m_logLevelComboBox->addItem("Error", QVariant::fromValue(Error));
+	m_logLevelComboBox->addItem("Critical", QVariant::fromValue(Critical));
+
+	m_logLevelComboBox->setFixedWidth(150);
+	m_logLevelComboBox->setCurrentIndex(Info);
+
+	// Server name
 	m_sftpServerNameLabel = new QLabel("Server");
 	horizontalLayoutUserCredentials->addWidget(m_sftpServerNameLabel);
 	m_sftpServerNameLineEdit = new QLineEdit;
 	horizontalLayoutUserCredentials->addWidget(m_sftpServerNameLineEdit);
 
-	//Server user name
+	// Server user name
 	m_sftpUserNameLabel = new QLabel("User name");
 	horizontalLayoutUserCredentials->addWidget(m_sftpUserNameLabel);
 	m_sftpUserNameLineEdit = new QLineEdit;
 	horizontalLayoutUserCredentials->addWidget(m_sftpUserNameLineEdit);
 
-	//Server password
+	// Server password
 	m_sftpPasswordNameLabel = new QLabel("Password");
 	horizontalLayoutUserCredentials->addWidget(m_sftpPasswordNameLabel);
 
@@ -637,7 +663,11 @@ TreeViewWidget::TreeViewWidget() {
 	m_sftpPasswordNameLineEdit->setEchoMode(QLineEdit::Password);
 	horizontalLayoutUserCredentials->addWidget(m_sftpPasswordNameLineEdit);
 
-	//Connect/Disconnect button stuf
+	// Log level
+	horizontalLogLevelLayout->addWidget(m_logLevelComboBox);
+	horizontalLogLevelLayout->addStretch();
+
+	// Connect/Disconnect button stuf
 	m_connectDisconnectButton = new QPushButton("Connect");
 	connect(m_connectDisconnectButton, SIGNAL(clicked()),
 		this, SLOT(onConnectButtonClicked()));
@@ -677,14 +707,20 @@ TreeViewWidget::TreeViewWidget() {
 	verticalLayout->addLayout(horizontalLayoutUserCredentials);
 	verticalLayout->addLayout(horizontalLayoutUploadDownloadParameters);
 	verticalLayout->addLayout(horizontalLayoutTreeView);
+	verticalLayout->addLayout(horizontalLogLevelLayout);
+	//verticalLayout->addWidget(&m_textDebugLog);
+
 	verticalLayout->addWidget(&m_textDebugLog);
+
+	// Connect the combobox signal to a slot to handle log filtering
+	connect(m_logLevelComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,  &TreeViewWidget::onLogLevelChanged);
 
 	// Add transfer status widget
 	m_transferStatusWidget = new QTreeWidget(this);
 	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
 	m_transferStatusWidget->setColumnCount(7);
 	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
-		<< "Bytes Transferred" << "Speed" << "Progress");
+														  << "Bytes Transferred" << "Speed" << "Progress");
 	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	m_transferStatusWidget->setSortingEnabled(true);
 
@@ -694,11 +730,7 @@ TreeViewWidget::TreeViewWidget() {
 	setLayout(verticalLayout);
 
 	Logger::instance().setLogWidget(&m_textDebugLog);
-	/*logger().debug() << "This is debug log!";
-	logger().info() << " This is info log!";
-	logger().warning() << "This is warning log!";
-	logger().error() << "This is error log!";
-	logger().critical() << "This is critical log!";*/
+	Logger::instance().setLogLevel(Info);
 }
 
 void TreeViewWidget::populateTreeView() {
@@ -911,7 +943,6 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 	}
 
 	m_treeWidget->setUpdatesEnabled(true);
-	logger().info() << "Directory tree refreshed.";
 }
 
 void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {

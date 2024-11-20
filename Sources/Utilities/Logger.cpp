@@ -108,16 +108,25 @@ void Logger::setLogFormat(LogLevel level, const QTextCharFormat& format) {
     m_formatMap[level] = format;
 }
 
-void Logger::log(const QString& message, LogLevel level) {
+void Logger::setLogLevel(LogLevel logLevel) {
+    QMutexLocker locker(&m_mutex);
+    m_logLevel = logLevel;
+}
+
+void Logger::log(const QString& message, LogLevel logLevel) {
     Logger& logger = Logger::instance();
+
+    if (logLevel < logger.m_logLevel) {
+        return;
+    }
 
     QString timeStamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     QString formattedMessage = QString("[%1] %2").arg(timeStamp, message);
 
-    emit logger.appendMessage(formattedMessage, level);
+    emit logger.appendMessage(formattedMessage, logLevel);
 }
 
-void Logger::handleAppendMessage(const QString& message, LogLevel level) {
+void Logger::handleAppendMessage(const QString& message, LogLevel logLevel) {
     QMutexLocker locker(&m_mutex);
 
     if (!m_textEdit) {
@@ -126,14 +135,14 @@ void Logger::handleAppendMessage(const QString& message, LogLevel level) {
 
     if (QThread::currentThread() != m_textEdit->thread()) {
         QMetaObject::invokeMethod(this, "handleAppendMessage", Qt::QueuedConnection,
-            Q_ARG(QString, message), Q_ARG(LogLevel, level));
+            Q_ARG(QString, message), Q_ARG(LogLevel, logLevel));
         return;
     }
 
     QTextCursor cursor(m_textEdit->document());
     cursor.movePosition(QTextCursor::End);
 
-    QTextCharFormat format = m_formatMap.value(level, QTextCharFormat());
+    QTextCharFormat format = m_formatMap.value(logLevel, QTextCharFormat());
 
     cursor.insertText(message + "\n", format);
 

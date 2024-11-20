@@ -15,6 +15,8 @@ enum LogLevel {
 	Critical
 };
 
+Q_DECLARE_METATYPE(LogLevel)
+
 class Logger : public QObject {
     Q_OBJECT
 
@@ -22,8 +24,8 @@ public:
     static Logger& instance();
     static void log(const QString& message, LogLevel level = Info);
     void setLogWidget(QTextEdit* textEdit);
-    void setLogFormat(LogLevel level, const QTextCharFormat& format);
-
+    void setLogFormat(LogLevel logLevel, const QTextCharFormat& format);
+    void setLogLevel(LogLevel logLevel);
     class LogStream {
     public:
         LogStream(Logger& logger, LogLevel level);
@@ -70,7 +72,7 @@ private:
     QTextEdit* m_textEdit;
     QMutex m_mutex;
     QMap<LogLevel, QTextCharFormat> m_formatMap;
-   
+    LogLevel m_logLevel;
     explicit Logger(QObject* parent = nullptr);
     //Logger(const Logger&) = delete;
     //Logger& operator=(const Logger&) = delete;

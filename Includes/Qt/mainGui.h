@@ -23,6 +23,7 @@
 #include <QDragMoveEvent>
 #include <QMimeData>
 #include <QIcon>
+#include <qcombobox.h>
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -67,6 +68,7 @@ public slots:
 	void onCopyAction();
 	void onCutAction();
 	void onPasteAction();
+	void onLogLevelChanged(int index);
 public:
 	TreeViewWidget();
 	void populateTreeView();
@@ -114,6 +116,7 @@ private:
 	QString m_directoryNameRemote;
 
 	QTextEdit m_textDebugLog;
+	QComboBox* m_logLevelComboBox;
 
 
 	TransferManager m_manager;

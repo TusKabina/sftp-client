@@ -50,7 +50,8 @@ enum class JobOperation {
     COPY,
     MOVE,
     DELETE,
-    DELETE_LOCAL
+    DELETE_LOCAL,
+    MKDIR
 
 };
 

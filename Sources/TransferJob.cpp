@@ -305,10 +305,40 @@ void TransferJob::deleteLocalFile(const std::string& path) {
         std::perror("Error deleting file");
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
         m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE_LOCAL] Error Message: Error deleting file";
-        std::cout << "[DELETE_LOCAL] Error Message: " + m_transferHandle.m_transferStatus.m_errorMessage << std::endl;
-        logger().error() << "Error deleting a file. Source: '" << m_transferFile.m_localPath << "'.";
+        logger().error() << "Failed to delete a file. Source: '" << m_transferFile.m_localPath << "'.";
         //onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
     }
+}
+
+void TransferJob::createDirectory(const std::string& path) {
+    if (m_transferHandle.m_curlHandle.get()) {
+        struct curl_slist* header = NULL;
+        //std::string encodedRemotePath = urlEncoder(m_transferFile.m_remotePath);
+        std::string mkdirCommand = "MKDIR " + std::string("\"") + m_transferFile.m_remotePath + std::string("\"");
+        header = curl_slist_append(header, mkdirCommand.c_str());
+
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, m_url.c_str());
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, dummyWriteCallback);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_QUOTE, header);
+
+        m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
+        CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
+
+        if (res != CURLE_OK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[MKDIR] Error Message: Failed to Create a directory " + path;
+            logger().error() << "Failed to create a directory. Path: " << path << "'.Error: " << std::string(curl_easy_strerror(res));
+            //onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
+        }
+        else {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+            m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE] Delete file: " + m_transferFile.m_remotePath + " completed.";
+            logger().info() << "Successfully created a directory. Path: " << path;
+            //onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
+        }
+        curl_slist_free_all(header);
+    }
+    curl_easy_reset(m_transferHandle.m_curlHandle.get());
 }
 
 uint64_t TransferJob::createJob(const std::string localPath, const std::string remotePath, const std::string url) {
@@ -316,8 +346,8 @@ uint64_t TransferJob::createJob(const std::string localPath, const std::string r
     m_transferFile.m_localDirectoryPath = m_transferFile.m_localPath.substr(0, m_transferFile.m_localPath.find_last_of('/'));
     m_transferFile.m_remotePath = remotePath;
     m_transferFile.m_remoteDirectoryPath = m_transferFile.m_remotePath.substr(0, m_transferFile.m_remotePath.find_last_of('/'));
-    m_jobId = UIDGenerator::getInstance().generateID();
     m_url = url;
+    m_jobId = UIDGenerator::getInstance().generateID();
     return m_jobId;
 }
 
