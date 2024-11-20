@@ -8,19 +8,41 @@ Logger& logger() {
     return Logger::instance();
 }
 
-Logger::LogStream::LogStream(Logger& logger, LogLevel level) : m_logger(logger), m_level(level) {}
+Logger::LogStream::LogStream(Logger& logger, LogLevel level) : m_logger(logger), m_level(level), m_flushed(false) {}
 
-Logger::LogStream::LogStream(Logger::LogStream&& other) noexcept : m_logger(other.m_logger), m_level(other.m_level), m_stream(std::move(other.m_stream)) {}
+Logger::LogStream::LogStream(Logger::LogStream&& other) noexcept : m_logger(other.m_logger), m_level(other.m_level), m_stream(std::move(other.m_stream)) {
+    m_flushed = true;
+}
 
 Logger::LogStream& Logger::LogStream::operator=(LogStream&& other) noexcept {
     if (this != &other) {
+        flush();
         m_stream = std::move(other.m_stream);
         m_level = other.m_level;
+        m_flushed = other.m_flushed;
+        other.m_flushed = true;
     }
     return *this;
 }
 
-Logger::LogStream::~LogStream() {}
+Logger::LogStream& Logger::LogStream::operator<<(std::ostream& (*manip)(std::ostream&)) {
+    m_stream << manip;
+    if (manip == static_cast<std::ostream & (*)(std::ostream&)>(std::endl)) {
+        flush();
+    }
+    return *this;
+}
+
+void Logger::LogStream::flush() {
+    if (!m_flushed) {
+        m_logger.log(QString::fromStdString(m_stream.str()), m_level);
+        m_flushed = true;
+    }
+}
+
+Logger::LogStream::~LogStream() {
+    flush();
+}
 
 Logger::LogStream Logger::debug() {
     return Logger::LogStream(*this, LogLevel::Debug);
@@ -36,6 +58,9 @@ Logger::LogStream Logger::warning() {
 
 Logger::LogStream Logger::error() {
     return Logger::LogStream(*this, LogLevel::Error);
+}
+Logger::LogStream Logger::critical() {
+    return Logger::LogStream(*this, LogLevel::Critical);
 }
 
 Logger& Logger::instance() {

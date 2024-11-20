@@ -94,6 +94,7 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
         //logger().error() << curl_easy_strerror(res) << ": " << path;
+        logger().info() << "Failed to open Directory. Source: '" << path << "'. Error: " << std::string(curl_easy_strerror(res));
         m_curlCode = static_cast<int>(res);
         curl_easy_reset(m_curlHandle.get());
         return entries;

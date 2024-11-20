@@ -37,25 +37,28 @@ public:
 
         template <typename T>
         LogStream& operator<<(const T& value) {
-            std::ostringstream tempStream;
-            tempStream << value;
-            m_stream = QString::fromStdString(tempStream.str());
-            m_logger.log(m_stream, m_level);
+            m_stream << value;
             return *this;
         }
+
+        LogStream& operator<<(std::ostream& (*manip)(std::ostream&));
+
+        void flush();
 
         ~LogStream();
 
     private:
         Logger& m_logger;
         LogLevel m_level;
-        QString m_stream;
+        std::stringstream m_stream;
+        bool m_flushed = false;
     };
 
     LogStream debug();
     LogStream info();
     LogStream warning();
     LogStream error();
+    LogStream critical();
 
 signals:
     void appendMessage(const QString& message, LogLevel level);
