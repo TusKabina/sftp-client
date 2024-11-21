@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 - 2024/11/21
 - Implemented disconnect.
 - Switched QPixmap with QIcon.
 - Optimized populating, updating, and refreshing tree view.
