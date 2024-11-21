@@ -34,6 +34,12 @@ public:
         return threadCurlStorage.localData();
     }
 
+    void cleanup() {
+        threadCurlStorage.setLocalData(nullptr);
+        clear();
+        waitForDone();
+    }
+
 private:
     QThreadStorage<std::shared_ptr<CURL>> threadCurlStorage;
 };
@@ -44,7 +50,8 @@ enum class JobOperation {
     COPY,
     MOVE,
     DELETE,
-    DELETE_LOCAL
+    DELETE_LOCAL,
+    MKDIR
 
 };
 
@@ -61,9 +68,9 @@ private:
     std::string m_username;
     std::string m_password;
     std::string m_url;
-    uint64_t m_maxHandlesNumber;
+    uint64_t m_maxHandlesNumber; // TODO: can be deleted?
 
-    std::atomic<uint64_t> m_handleCounter = 0;
+    std::atomic<uint64_t> m_handleCounter = 0; // TODO: can be deleted?
     bool m_initialized;
     CurlThreadPool m_threadPool;
     QMutex m_mutex;
@@ -80,6 +87,8 @@ public:
     void executeJob(uint64_t jobId, JobOperation jobType, std::shared_ptr<CURL> curl);
     void deleteJob(uint64_t jobId);
     void updateCacheDirectory(const std::string& path) { m_DirectoryCache.updateDirectoryCache(path, 3); }
+
+    void reset();
 
     [[nodiscard]] const std::vector<DirectoryEntry> getDirectoryList(const std::string& path = "");
     [[nodiscard]] uint64_t prepareJob(const std::string localPath, const std::string remotePath);

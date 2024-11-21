@@ -41,24 +41,6 @@
     },
     {
       "hidden": true,
-      "name": "5.9.1_msvc2015_64",
-      "inherits": "Qt",
-      "environment": {
-        "QTDIR": "C:/Games/Qt/5.9.1/msvc2015_64"
-      },
-      "architecture": {
-        "strategy": "external",
-        "value": "x64"
-      },
-      "generator": "Ninja",
-      "vendor": {
-        "qt-project.org/Version": {
-          "checksum": "U4hCeeCrQgBiMrxbTtnkqTXVaRs="
-        }
-      }
-    },
-    {
-      "hidden": true,
       "name": "Qt-Default",
       "inherits": "5.15.2_msvc2019_64",
       "vendor": {
@@ -70,7 +52,7 @@
   ],
   "vendor": {
     "qt-project.org/Presets": {
-      "checksum": "2uxBRvJnWNuhF4zoj2+oJVXuO2Y="
+      "checksum": "jmPoAVa0v6hYmkMy/JYCz3DgrkY="
     }
   }
 }

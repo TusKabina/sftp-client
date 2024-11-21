@@ -15,7 +15,6 @@
 #include <QString>
 #include <QVBoxLayout>
 #include <QtWidgets/qfilesystemmodel.h>
-#include "WorkerThread.h"
 #include "ThreadPool.h"
 #include "TransferManager.h"
 #include <qdrag.h>
@@ -23,6 +22,8 @@
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QMimeData>
+#include <QIcon>
+#include <qcombobox.h>
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -67,6 +68,7 @@ public slots:
 	void onCopyAction();
 	void onCutAction();
 	void onPasteAction();
+	void onLogLevelChanged(int index);
 public:
 	TreeViewWidget();
 	void populateTreeView();
@@ -114,8 +116,8 @@ private:
 	QString m_directoryNameRemote;
 
 	QTextEdit m_textDebugLog;
+	QComboBox* m_logLevelComboBox;
 
-	bool m_isConnected = false;
 
 	TransferManager m_manager;
 
@@ -126,6 +128,10 @@ private:
 
 	QString m_sourcePath;
 	bool m_isCutOperation;
+	bool m_isConnected = false;
+
+	static QIcon& getDirectoryIcon();
+	static QIcon& getFileIcon();
 };
 
 #endif // SFTP_CLIENT_MAINGUI_H

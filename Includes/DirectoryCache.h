@@ -12,6 +12,8 @@
 struct DirectoryEntry {
     std::string m_name;
     std::string m_lastModified;
+    std::string m_owner;
+    std::string m_permissions;
     uint64_t m_totalBytes;
     bool m_forbidden = false;
     bool m_isDirectory = false;
@@ -46,6 +48,8 @@ public:
     void prefetchDirectories(const std::string& path, int depth);
     void updateDirectoryCache(const std::string& path, int depth);
     void refreshDirectory(const std::string& path);
+
+    void reset();
 
     ~DirectoryCache() {}
 

@@ -2,6 +2,7 @@
 #include <iostream> //TODO: DELETE
 #include <sstream>
 #include <algorithm>
+#include "Utilities/Logger.h"
 
 std::string urlEncode(const std::string& url) {
     std::ostringstream encoded;
@@ -34,6 +35,7 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
         if (res != 0) {
             m_curlCode = static_cast<int>(res);
             m_initialized = false;
+            logger().error() << std::string(curl_easy_strerror(res));
         }
         else {
             m_initialized = true;
@@ -67,6 +69,8 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
             prefetchDirectories(subPath, depth - 1);
         }
     }
+    logger().debug() << "Pre fetching directory: " << path;
+
 }
 
 void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
@@ -93,9 +97,14 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
 
     if (res != CURLE_OK) {
         std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
+        //logger().error() << curl_easy_strerror(res) << ": " << path;
+        logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
         m_curlCode = static_cast<int>(res);
         curl_easy_reset(m_curlHandle.get());
         return entries;
+    }
+    else {
+        logger().debug() << "Directory listing of: " << path << " Successful.";
     }
     parseResponse(entries, response);
     curl_easy_reset(m_curlHandle.get());
@@ -154,6 +163,14 @@ void DirectoryCache::refreshDirectory(const std::string& path) {
     emit onDirectoryUpdated(path);
 }
 
+void DirectoryCache::reset() {
+    m_curlHandle.reset();
+    m_curlCode = 0;
+    m_baseUrl = "";
+    m_cache.clear();
+    m_initialized = false;
+}
+
 size_t DirectoryCache::writeCallback(void* buffer, size_t size, size_t nmemb, std::string& response) {
 	response.append(static_cast<char*>(buffer), size * nmemb);
 	return size * nmemb;
@@ -186,6 +203,8 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         entry.m_totalBytes = std::stoul(strSize);
         entry.m_name = name;
         entry.m_lastModified = month + " " + day + " " + timeOrYear;
+        entry.m_owner = owner;
+        entry.m_permissions = permissions;
 
         entries.push_back(entry);
     }

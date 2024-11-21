@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <QFileInfo>
 #include <qstring.h>
+#include "Utilities/Logger.h"
+
 void TransferManager::setCredentials(const std::string& host, const std::string& username, const std::string& password) {
     m_url = "sftp://" + username + ":" + password + "@" + host;
     m_username = username;
@@ -22,9 +24,9 @@ uint64_t TransferManager::prepareJob(const std::string localPath, const std::str
 
 void TransferManager::connect(const std::string& host, const std::string& username, std::string& password) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
-
     if (!m_DirectoryCache.initialize(host, username, password)) {
         m_initialized = false;
+        logger().critical() << "Failed to connect to the server";
         return;
     }
     setCredentials(host, username, password);
@@ -116,7 +118,14 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 break;
             case JobOperation::DELETE_LOCAL:
                 (*job)->deleteLocalFile((*job)->getLocalPath());
-
+                break;
+            case JobOperation::MKDIR:
+                (*job)->createDirectory((*job)->getRemotePath());
+                {
+                    QMutexLocker locker(&m_mutex);
+                    m_DirectoryCache.refreshDirectory(remoteDirPath);
+                }
+                break;
         }
     }
 }
@@ -133,6 +142,7 @@ const TransferJob* TransferManager::getJob(uint64_t jobId) const {
     });
     if(job == m_transferJobs.end()) {
         std::string err = "Job with job id: " + std::to_string(jobId) + " Not found";
+        logger().critical() << "Job with job id: " << jobId << " Not found";
         throw std::runtime_error(err.c_str());
     }
     return *job;
@@ -145,6 +155,29 @@ TransferHandle &TransferManager::findFreeHandle() {
     if (handle != m_transferHandles.end()) {
         return *handle;
     }
+}
+
+void TransferManager::reset() {
+    m_DirectoryCache.reset();
+
+    for (auto& handle : m_transferHandles) {
+        handle.m_curlHandle.reset();
+        handle.m_transferStatus.reset();
+    }
+
+    for (TransferJob* job : m_transferJobs) {
+        delete job;
+    }
+
+    m_transferJobs.clear();
+    m_username = "";
+    m_password = "";
+    m_url = "";
+    m_maxHandlesNumber = 0;
+    m_handleCounter = 0;
+    m_initialized = false;
+
+   // m_threadPool.cleanup();
 }
 
 const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::string &path) {

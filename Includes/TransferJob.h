@@ -68,6 +68,7 @@ public:
     void moveFile(const std::string& url);
     void deleteFile(const std::string& url);
     void deleteLocalFile(const std::string& path);
+    void createDirectory(const std::string& path);
 };
 
 #endif //SFTP_INTERFACE_TRANSFERJOB_H

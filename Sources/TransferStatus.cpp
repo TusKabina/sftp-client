@@ -79,6 +79,30 @@ void TransferStatus::updateSpeed(size_t bytesTransferred) {
     m_lastBytesTransferred = bytesTransferred;
 }
 
+void TransferStatus::reset() {
+    m_state = TransferState::Unknown;
+    m_bytesTransferred = 0;
+    m_totalBytes = 0;
+    m_threshold = 0;
+    signal_threshold = 0;
+    m_lastBytesTransferred = 0;
+    m_jobId = 0;
+    m_source = "";
+    m_destination = "";
+    m_errorMessage = "";
+    m_curlResCode = 0;
+    m_speed = 0;
+    m_smoothedSpeed = 0;
+    m_progress = 0;
+    m_startTime = QDateTime();
+    m_lastUpdateTime = QDateTime();
+    m_alpha = 0.0;
+    m_lowSpeedCount = 0;
+    m_highSpeedCount = 0;
+    m_thresholdCount = 0;
+
+}
+
 const std::string TransferStatus::TransferStatetoString() const {
     std::string strState;
     switch (m_state) {
