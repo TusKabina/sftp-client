@@ -299,8 +299,7 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 	if (path.back() != '/') {
 		path = path + "/";
 	}
-	std::cout << "Pressed Path: " << path << std::endl;
-	
+	logger().info() << "Going to path: " << path;
 	findAndExpandPath(QString::fromStdString(path));
 
 }
@@ -391,10 +390,13 @@ void TreeViewWidget::onPasteAction() {
 	m_sourcePath.clear();
 	m_isCutOperation = false;
 }
+// TODO: useless casting of selectedLogLevel twice. Fix it. 
 void TreeViewWidget::onLogLevelChanged(int index) {
-	int selectedLogLevel = m_logLevelComboBox->currentData().toInt();
-	Logger::instance().setLogLevel(static_cast<LogLevel>(selectedLogLevel));
+	LogLevel selectedLogLevel = static_cast<LogLevel>(m_logLevelComboBox->currentData().toInt());
+	Logger::instance().setLogLevel(selectedLogLevel);
+	logger().critical() << "Log level changed to: " << logLevelToString(static_cast<LogLevel>(selectedLogLevel));
 }
+
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 	if (index.isValid()) {
 		m_textCommandParameterLocal = ((QFileSystemModel*)m_treeView->model())->filePath(index);
@@ -423,9 +425,9 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 	}
 
 	if (prefetch && entryType == "Folder") {
-		logger().info() << "Expanding Directory: /" << fullPath.toStdString();
+		logger().debug() << "Expanding Directory: /" << fullPath.toStdString();
 		updateTreeView("/" + fullPath.toStdString() + "/");
-		logger().info() << "Expanding Directory successful";
+		logger().debug() << "Expanding Directory successful";
 	}
 		
 	std::string newPath = fullPath.toStdString();
@@ -607,7 +609,7 @@ TreeViewWidget::TreeViewWidget() {
 		this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
 	m_treeWidget->setEnabled(true);
 	m_treeWidget->setColumnCount(4);
-	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified" });
+	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified", "Permissions", "Owner"});
 	m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	m_treeWidget->setSortingEnabled(true);
 	//m_treeWidget->setHeaderHidden(true);
@@ -749,11 +751,15 @@ void TreeViewWidget::populateTreeView() {
 			QString entryName = QString::fromStdString(entry.m_name);
 			QDateTime dateTime = parseDateString(entry.m_lastModified);
 			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
+			QString permissions = QString::fromStdString(entry.m_permissions);
+			QString owner = QString::fromStdString(entry.m_owner);
 
 			QTreeWidgetItem* item = new QTreeWidgetItem(root);
 			item->setText(0, entryName);
 			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
 			item->setText(3, formattedDate);
+			item->setText(4, permissions);
+			item->setText(5, owner);
 
 			if (entry.m_isDirectory) {
 				item->setIcon(0, getDirectoryIcon());
@@ -773,15 +779,18 @@ void TreeViewWidget::populateTreeView() {
 
 void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 	m_treeWidget->setUpdatesEnabled(false);
-	auto startOverall = std::chrono::high_resolution_clock::now();
 
+	auto startOverall = std::chrono::high_resolution_clock::now();
 	auto start = std::chrono::high_resolution_clock::now();
+
 	QString qPath = QString::fromStdString(path);
 	QTreeWidgetItem* root = findOrCreateRoot(qPath);
+
 	if (!root) {
 		m_treeWidget->setUpdatesEnabled(true);
 		return;
 	}
+
 	auto end = std::chrono::high_resolution_clock::now();
 	MeasureHelper::logDuration("findOrCreateRoot", start, end);
 
@@ -848,6 +857,16 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 			if (item->text(1) != sizeText) {
 				item->setText(1, sizeText);
 			}
+		}
+
+		QString permissions = QString::fromStdString(entry.m_permissions);
+		if (item->text(4) != permissions) {
+			item->setText(4, permissions);
+		}
+
+		QString owner = QString::fromStdString(entry.m_owner);
+		if (item->text(5) != owner) {
+			item->setText(5, owner);
 		}
 	}
 	end = std::chrono::high_resolution_clock::now();
@@ -934,6 +953,16 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		if (currentData.toBool() != desiredData) {
 			item->setData(0, Qt::UserRole, desiredData);
 		}
+
+		QString permissions = QString::fromStdString(entry.m_permissions);
+		if (item->text(4) != permissions) {
+			item->setText(4, permissions);
+		}
+
+		QString owner = QString::fromStdString(entry.m_owner);
+		if (item->text(5) != owner) {
+			item->setText(5, owner);
+		}
 	}
 
 	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
@@ -998,6 +1027,16 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 		bool desiredData = entry.m_isDirectory;
 		if (currentData.toBool() != desiredData) {
 			item->setData(0, Qt::UserRole, desiredData);
+		}
+
+		QString permissions = QString::fromStdString(entry.m_permissions);
+		if (item->text(4) != permissions) {
+			item->setText(4, permissions);
+		}
+
+		QString owner = QString::fromStdString(entry.m_owner);
+		if (item->text(5) != owner) {
+			item->setText(5, owner);
 		}
 
 		if (!entry.m_isDirectory) {

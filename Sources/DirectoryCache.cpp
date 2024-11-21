@@ -50,7 +50,6 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
 
 
 void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
-    logger().debug() << "Pre fetching directory: " << path;
     if (depth == 0) {
         return;
     }
@@ -70,6 +69,8 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
             prefetchDirectories(subPath, depth - 1);
         }
     }
+    logger().debug() << "Pre fetching directory: " << path;
+
 }
 
 void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
@@ -202,6 +203,8 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         entry.m_totalBytes = std::stoul(strSize);
         entry.m_name = name;
         entry.m_lastModified = month + " " + day + " " + timeOrYear;
+        entry.m_owner = owner;
+        entry.m_permissions = permissions;
 
         entries.push_back(entry);
     }

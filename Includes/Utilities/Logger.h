@@ -15,6 +15,8 @@ enum LogLevel {
 	Critical
 };
 
+
+
 Q_DECLARE_METATYPE(LogLevel)
 
 class Logger : public QObject {
@@ -80,4 +82,29 @@ private:
 
 Logger& logger();
 
+static const std::string logLevelToString(LogLevel logLevel) {
+    std::string strLogLevel;
+
+    switch (logLevel)
+    {
+    case Debug:
+        strLogLevel = "Debug";
+        break;
+    case Info:
+        strLogLevel = "Info";
+        break;
+    case Warning:
+        strLogLevel = "Warning";
+        break;
+    case Error:
+        strLogLevel = "Error";
+        break;
+    case Critical:
+        strLogLevel = "Critical";
+        break;
+    default:
+        break;
+    }
+    return strLogLevel;
+}
 #endif //SFTP_CLIENT_LOGGER_H
