@@ -85,6 +85,7 @@ private:
 
 private:
 	TreeView* m_treeView;
+	TreeView* m_remoteTreeView;
 	TreeWidget* m_treeWidget;
 
 	QLabel* m_sftpServerNameLabel;

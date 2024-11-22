@@ -390,7 +390,7 @@ void TreeViewWidget::onPasteAction() {
 	m_sourcePath.clear();
 	m_isCutOperation = false;
 }
-// TODO: useless casting of selectedLogLevel twice. Fix it. 
+
 void TreeViewWidget::onLogLevelChanged(int index) {
 	LogLevel selectedLogLevel = static_cast<LogLevel>(m_logLevelComboBox->currentData().toInt());
 	Logger::instance().setLogLevel(selectedLogLevel);

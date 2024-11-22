@@ -24,6 +24,7 @@ set(CMAKE_AUTOMOC ON)
 add_executable(SftpClient main.cpp 
         Includes/Qt/ThreadPool.h 
         Includes/Qt/mainGui.h 
+        Includes/Qt/FileSystem.h
         Includes/Utilities/MeasureHelper.h
         Includes/Utilities/Logger.h
         Includes/HandleDeleter.h
@@ -36,6 +37,7 @@ add_executable(SftpClient main.cpp
         Includes/TransferHandle.h
         Sources/Qt/ThreadPool.cpp 
         Sources/Qt/mainGui.cpp 
+        Sources/Qt/FileSystem.cpp
         Sources/Utilities/Logger.cpp
         Sources/TransferStatus.cpp
         Sources/TransferJob.cpp
