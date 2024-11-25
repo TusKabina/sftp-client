@@ -18,6 +18,55 @@ std::string urlEncode(const std::string& url) {
     return encoded.str();
 }
 
+time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::string& dayStr, const std::string& timeOrYearStr) {
+    static const std::unordered_map<std::string, int> monthMap = {
+        {"Jan", 0}, {"Feb", 1}, {"Mar", 2}, {"Apr", 3},
+        {"May", 4}, {"Jun", 5}, {"Jul", 6}, {"Aug", 7},
+        {"Sep", 8}, {"Oct", 9}, {"Nov", 10}, {"Dec", 11}
+    };
+
+    struct tm tm = { 0 };
+    auto monthIt = monthMap.find(monthStr);
+    if (monthIt == monthMap.end()) {
+        return 0; // Invalid month
+    }
+    tm.tm_mon = monthIt->second;
+
+    tm.tm_mday = std::stoi(dayStr);
+
+    time_t now = time(nullptr);
+    struct tm* now_tm = localtime(&now);
+
+    if (timeOrYearStr.find(':') != std::string::npos) {
+        // Time format
+        int hour = std::stoi(timeOrYearStr.substr(0, 2));
+        int minute = std::stoi(timeOrYearStr.substr(3, 2));
+        tm.tm_hour = hour;
+        tm.tm_min = minute;
+        tm.tm_sec = 0;
+        tm.tm_year = now_tm->tm_year;
+
+        time_t file_time = mktime(&tm);
+
+        // If the computed file_time is more than 6 months in the future,
+        // it means the file was actually modified in the previous year
+        if (difftime(file_time, now) > (6 * 30 * 24 * 3600)) {
+            tm.tm_year -= 1;
+            file_time = mktime(&tm);
+        }
+        return file_time;
+    }
+    else {
+        // Year format
+        int year = std::stoi(timeOrYearStr);
+        tm.tm_year = year - 1900;
+        tm.tm_hour = 0;
+        tm.tm_min = 0;
+        tm.tm_sec = 0;
+        return mktime(&tm);
+    }
+}
+
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
     m_curlCode = 0;
@@ -63,7 +112,7 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     }
     m_cache[path] = entries;
     for (const auto& entry : entries) {
-        if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
+        if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != "." && entry.m_name != "mnt")) {
             std::string subPath;
             subPath = path + entry.m_name + "/";
             prefetchDirectories(subPath, depth - 1);
@@ -196,15 +245,16 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         if (day.size() == 1) {
             day = '0' + day;
         }
+
         DirectoryEntry entry;
-        entry.m_isDirectory = permissions[0] == 'd' ? true : false;
-        entry.m_isSymLink = permissions[0] == 'l' ? true : false;
-        entry.m_isFile = permissions[0] == '-' ? true : false;
+        entry.m_isDirectory = permissions[0] == 'd';
+        entry.m_isSymLink = permissions[0] == 'l';
+        entry.m_isFile = permissions[0] == '-';
         entry.m_totalBytes = std::stoul(strSize);
         entry.m_name = name;
-        entry.m_lastModified = month + " " + day + " " + timeOrYear;
         entry.m_owner = owner;
         entry.m_permissions = permissions;
+        entry.m_tLastModified = parseDateFromLs(month, day, timeOrYear);
 
         entries.push_back(entry);
     }

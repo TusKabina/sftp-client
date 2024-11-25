@@ -15,7 +15,7 @@ file(GLOB SOURCE_FILES "Sources/*.cpp")
 
 
 # Find the Qt5 package
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt5 REQUIRED COMPONENTS Widgets Core)
 find_package(CURL REQUIRED)
 # Enable automatic invocation of MOC
 set(CMAKE_AUTOMOC ON)
@@ -25,14 +25,17 @@ add_executable(SftpClient main.cpp
         Includes/Qt/ThreadPool.h 
         Includes/Qt/mainGui.h 
         Includes/Qt/FileSystem.h
+        Includes/Qt/IconManager.h
         Includes/Utilities/MeasureHelper.h
         Includes/Utilities/Logger.h
+        Includes/Utilities/Commons.h
         Includes/HandleDeleter.h
         Includes/TransferJob.h
         Includes/TransferManager.h
         Includes/TransferFile.h
         Includes/TransferStatus.h
         Includes/UIDGenerator.h  
+        Includes/DirectoryEntry.h
         Includes/DirectoryCache.h 
         Includes/TransferHandle.h
         Sources/Qt/ThreadPool.cpp 
@@ -48,4 +51,11 @@ add_executable(SftpClient main.cpp
 
 # Link the Qt5 Widgets library
 target_link_libraries(SftpClient Qt5::Widgets)
+target_link_libraries(SftpClient Qt5::Core)
 target_link_libraries(SftpClient ${CURL_LIBRARIES})
+
+# Add the .qrc file
+qt5_add_resources(RESOURCE_FILES Resources/Resources.qrc)
+
+# Include the resource files in the executable
+target_sources(SftpClient PRIVATE ${RESOURCE_FILES})

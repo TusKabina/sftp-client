@@ -24,6 +24,8 @@
 #include <QMimeData>
 #include <QIcon>
 #include <qcombobox.h>
+#include "Qt/FileSystem.h"
+#include "Utilities/Commons.h"
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -77,15 +79,21 @@ public:
 	void insertTreeViewWidget();
 	void findAndExpandPath(const QString& path);
 	void populateTreeWidgetViewDirectory(QTreeWidgetItem* parentItem, const QString& path);
+	void onCaptureExpandedState();
+	void onRestoreExpandedState();
+	void captureExpandedState(const QModelIndex& index);
+	void restoreExpandedState(const QModelIndex& index);
 
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
+	FileInfo* findOrCreateDirectory(FileInfo& root, const QString& path);
 
 private:
 	TreeView* m_treeView;
-	TreeView* m_remoteTreeView;
+	QTreeView* m_remoteTreeView;
+	FileSystem* m_fileModel;
 	TreeWidget* m_treeWidget;
 
 	QLabel* m_sftpServerNameLabel;
@@ -128,6 +136,7 @@ private:
 	QMutex m_mutex;
 
 	QString m_sourcePath;
+	QList<QString> m_expandedPaths;
 	bool m_isCutOperation;
 	bool m_isConnected = false;
 

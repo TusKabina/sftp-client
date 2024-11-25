@@ -6,6 +6,7 @@
 #include "Qt/mainGui.h"
 #include "Utilities/MeasureHelper.h"
 #include "Utilities/Logger.h"
+#include "Qt/IconManager.h"
 
 QIcon& TreeViewWidget::getDirectoryIcon() {
 	static QIcon directoryIcon("dir.png");
@@ -17,27 +18,27 @@ QIcon& TreeViewWidget::getFileIcon() {
 	return fileIcon;
 }
 
-std::string GetDirectoryName(const std::string& name) {
-	size_t pos = name.find_last_of("\\/");
-	return (std::string::npos == pos) ? "" : name.substr(0, pos);
-}
-
-std::string FileName(const std::string& path) {
-	return path.substr(path.find_last_of("/\\") + 1);
-}
-
-QString convertSize(qint64 size) {
-	QStringList units = { "B", "KB", "MB", "GB", "TB" };
-	int unitIndex = 0;
-	double sizeInUnits = size;
-
-	while (sizeInUnits > 1024.0 && unitIndex < units.size() - 1) {
-		sizeInUnits /= 1024.0;
-		unitIndex++;
-	}
-
-	return QString::number(sizeInUnits, 'f', 2) + " " + units[unitIndex];
-}
+//std::string GetDirectoryName(const std::string& name) {
+//	size_t pos = name.find_last_of("\\/");
+//	return (std::string::npos == pos) ? "" : name.substr(0, pos);
+//}
+//
+//std::string FileName(const std::string& path) {
+//	return path.substr(path.find_last_of("/\\") + 1);
+//}
+//
+//QString convertSize(qint64 size) {
+//	QStringList units = { "B", "KB", "MB", "GB", "TB" };
+//	int unitIndex = 0;
+//	double sizeInUnits = size;
+//
+//	while (sizeInUnits > 1024.0 && unitIndex < units.size() - 1) {
+//		sizeInUnits /= 1024.0;
+//		unitIndex++;
+//	}
+//
+//	return QString::number(sizeInUnits, 'f', 2) + " " + units[unitIndex];
+//}
 
 QDateTime parseDateString(const std::string& dateString) {
 	QStringList dateParts = QString::fromStdString(dateString).split(' ');
@@ -110,13 +111,13 @@ void TreeView::dropEvent(QDropEvent* event) {
 		QString localPath = ((QFileSystemModel*)model())->filePath(droppedIndex);
 		std::filesystem::path p = localPath.toStdString();
 
-		std::string fileName = FileName(dataAsString.toStdString());
+		std::string fileName = Commons::FileName(dataAsString.toStdString());
 		localPath = localPath + "/" + fileName.c_str();
 		std::string remotePath = "/" + dataAsString.toStdString();
 		std::string directoryPath;
 
 		if (!std::filesystem::is_directory(p)) {
-			directoryPath = GetDirectoryName(p.string());
+			directoryPath = Commons::GetDirectoryName(p.string());
 			localPath = QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
 		}
 		std::string testLocal = localPath.toStdString();
@@ -210,13 +211,13 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 
 		std::string testRemote = remotePath.toStdString();
 		std::string testLocal = dataAsString.toStdString();
-		std::string fileName = FileName(dataAsString.toStdString());
+		std::string fileName = Commons::FileName(dataAsString.toStdString());
 
 		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
 		if (parentWidget) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
 			if(transferManager.isRegularFile("/" + remotePath.toStdString())) {
-				std::string directoryPath = GetDirectoryName("/" + remotePath.toStdString());
+				std::string directoryPath = Commons::GetDirectoryName("/" + remotePath.toStdString());
 				remotePath = QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
 			}
 			else {
@@ -228,8 +229,6 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 			transferManager.submitJob(uploadJobId, JobOperation::UPLOAD);
 
 		}
-		
-		int test = 666;
 	}
 
 	event->accept();
@@ -245,23 +244,23 @@ void deleteTreeItems(QTreeWidgetItem* item) {
 
 void TreeViewWidget::onConnectButtonClicked() {
 	if (m_isConnected) {
+		// Disconnect logic
 		m_manager.reset();
 
-		for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
-			QTreeWidgetItem* topLevelItem = m_treeWidget->topLevelItem(i);
-			deleteTreeItems(topLevelItem);
-		}
+		// Clear the model by resetting its root
+		FileInfo emptyRoot;
+		m_fileModel->setRoot(emptyRoot);
 
-		m_treeWidget->clear();
 		m_isConnected = false;
-		//m_textDebugLog.append("Disconnected");
 		logger().info() << "Disconnected";
 		m_connectDisconnectButton->setText("Connect");
+
 		m_remoteFileToUploadLineEdit->clear();
 		m_remoteFolderLineEdit->clear();
 		return;
 	}
 
+	// Connect logic
 	std::string host = m_sftpServerNameLineEdit->text().toStdString();
 	std::string username = m_sftpUserNameLineEdit->text().toStdString();
 	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();
@@ -273,13 +272,12 @@ void TreeViewWidget::onConnectButtonClicked() {
 	m_isConnected = m_manager.isInitialized();
 
 	if (m_isConnected) {
-		//m_textDebugLog.append("Connected");
 		logger().info() << "Connected";
 		m_connectDisconnectButton->setText("Disconnect");
+
 		populateTreeView();
 	}
 	else {
-		//m_textDebugLog.append("Disconnected");
 		logger().info() << "Disconnected";
 		m_connectDisconnectButton->setText("Connect");
 	}
@@ -318,7 +316,7 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 		m_transferStatusWidget->addTopLevelItem(item);
 	}
 
-	std::string fileName = FileName(transferStatus.m_source);
+	std::string fileName = Commons::FileName(transferStatus.m_source);
 	item->setText(0, QString::fromStdString(fileName));
 	item->setText(1, QString::fromStdString(transferStatus.TransferStatetoString()));
 	item->setText(2, QString::fromStdString(transferStatus.m_source));
@@ -353,10 +351,10 @@ void TreeViewWidget::onPasteAction() {
 		else {
 			std::string destPath = "/" + destinationPath.toStdString();
 			if (!m_manager.isRegularFile(destPath)) {
-				destPath = destPath + '/' + FileName(sourcePath);
+				destPath = destPath + '/' + Commons::FileName(sourcePath);
 			}
 			else {
-				destPath = GetDirectoryName(destPath) + "/" + FileName(sourcePath);
+				destPath = Commons::GetDirectoryName(destPath) + "/" + Commons::FileName(sourcePath);
 			}
 			//m_textDebugLog.append(QString::fromStdString("[MOVE] Source: " + sourcePath + " Destination: " + destPath));
 			logger().info() << "Starterd move operation. Source: '" << sourcePath << "' Destination: '" << destPath << "'";
@@ -375,13 +373,13 @@ void TreeViewWidget::onPasteAction() {
 		else {
 			std::string destPath = "/" + destinationPath.toStdString();
 			if (!m_manager.isRegularFile(destPath)) {
-				destPath = destPath + '/' + FileName(sourcePath);
+				destPath = destPath + '/' + Commons::FileName(sourcePath);
 			}
 			else {
-				destPath = GetDirectoryName(destPath) + "/" + FileName(sourcePath);
+				destPath = Commons::GetDirectoryName(destPath) + "/" + Commons::FileName(sourcePath);
 			}
 			//m_textDebugLog.append(QString::fromStdString("[COPY] Source: " + sourcePath + " Destination: " + destPath));
-			logger().info() << "Starterd copy operation. Source: '" << sourcePath << "' Destination: '" << destPath << "'";
+			logger().info() << "Started copy operation. Source: '" << sourcePath << "' Destination: '" << destPath << "'";
 			uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
 			m_manager.submitJob(copyJobId, JobOperation::COPY);
 
@@ -408,7 +406,7 @@ void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
 		else {
 			m_localFileToUploadLineEdit->clear();
 		}
-		m_directoryNameLocal = GetDirectoryName(((QFileSystemModel*)m_treeView->model())->filePath(index).toStdString()).c_str();
+		m_directoryNameLocal = Commons::GetDirectoryName(((QFileSystemModel*)m_treeView->model())->filePath(index).toStdString()).c_str();
 		m_directoryNameLocal += "/";
 		m_localFolderLineEdit->setText(m_directoryNameLocal);
 	}
@@ -439,7 +437,7 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 		m_remoteFileToUploadLineEdit->clear();
 	}
 	m_textCommandParameterRemote = fullPath;
-	m_directoryNameRemote = "/" + QString::fromStdString(GetDirectoryName(m_textCommandParameterRemote.toStdString()));
+	m_directoryNameRemote = "/" + QString::fromStdString(Commons::GetDirectoryName(m_textCommandParameterRemote.toStdString()));
 	m_directoryNameRemote += m_directoryNameRemote == "/" ? "" : "/";
 	m_remoteFolderLineEdit->setText(m_directoryNameRemote);
 }
@@ -598,31 +596,50 @@ TreeViewWidget::TreeViewWidget() {
 	m_treeView->header()->setSortIndicatorShown(true);
 	m_treeView->selectionModel();
 
-	//Tree widget for remote machine files
-	m_treeWidget = new TreeWidget(this);
-	m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_treeWidget->setDragEnabled(true);
-	m_treeWidget->viewport()->setAcceptDrops(true);
-	m_treeWidget->setDropIndicatorShown(true);
-	m_treeWidget->setDragDropMode(QAbstractItemView::DragDrop);
-	connect(m_treeWidget, SIGNAL(RightClickAction(QMouseEvent*)),
-		this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
-	m_treeWidget->setEnabled(true);
-	m_treeWidget->setColumnCount(4);
-	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified", "Permissions", "Owner"});
-	m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_treeWidget->setSortingEnabled(true);
-	//m_treeWidget->setHeaderHidden(true);
-	//m_treeWidget->setHeaderLabels(QStringList() << tr("Name"));
+	////Tree widget for remote machine files
+	//m_treeWidget = new TreeWidget(this);
+	//m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+	//m_treeWidget->setDragEnabled(true);
+	//m_treeWidget->viewport()->setAcceptDrops(true);
+	//m_treeWidget->setDropIndicatorShown(true);
+	//m_treeWidget->setDragDropMode(QAbstractItemView::DragDrop);
+	//connect(m_treeWidget, SIGNAL(RightClickAction(QMouseEvent*)),
+	//	this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
+	//m_treeWidget->setEnabled(true);
+	//m_treeWidget->setColumnCount(4);
+	//m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified", "Permissions", "Owner"});
+	//m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	//m_treeWidget->setSortingEnabled(true);
+	////m_treeWidget->setHeaderHidden(true);
+	////m_treeWidget->setHeaderLabels(QStringList() << tr("Name"));
+	//
+	//connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
+	//	this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
+
+	//const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
+	//connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
+	//		this->onDirectoryCacheUpdated(path);
+	//	});
+
+	// Tree view for remote machine files
+	m_remoteTreeView = new QTreeView(this);
+	m_remoteTreeView->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_remoteTreeView->setDragEnabled(true);
+	m_remoteTreeView->setAcceptDrops(true);
+	m_remoteTreeView->setDropIndicatorShown(true);
+	m_remoteTreeView->setDragDropMode(QAbstractItemView::DragDrop);
+	m_remoteTreeView->setSortingEnabled(true);
+	m_remoteTreeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_remoteTreeView->header()->setSectionsClickable(true);
 	
-	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
-		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
+	m_fileModel = new FileSystem(this);
+	m_remoteTreeView->setModel(m_fileModel);
 
-	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
-	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
-			this->onDirectoryCacheUpdated(path);
-		});
+	connect(m_fileModel, &FileSystem::beginRefreshModel, this, &TreeViewWidget::onCaptureExpandedState);
+	connect(m_fileModel, &FileSystem::endRefreshModel, this, &TreeViewWidget::onRestoreExpandedState);
 
+	// Connect signals
+	//connect(m_remoteTreeView, &QTreeView::clicked, this, &TreeViewWidget::processTreeWidgetItemClicked);
 
 	//Basic layout for widgets
 	QHBoxLayout* horizontalLayoutUserCredentials = new QHBoxLayout;
@@ -669,10 +686,10 @@ TreeViewWidget::TreeViewWidget() {
 	horizontalLogLevelLayout->addWidget(m_logLevelComboBox);
 	horizontalLogLevelLayout->addStretch();
 
-	// Connect/Disconnect button stuf
+	// Connect/Disconnect
 	m_connectDisconnectButton = new QPushButton("Connect");
-	connect(m_connectDisconnectButton, SIGNAL(clicked()),
-		this, SLOT(onConnectButtonClicked()));
+	connect(m_connectDisconnectButton, SIGNAL(clicked()), this, SLOT(onConnectButtonClicked()));
+
 	horizontalLayoutUserCredentials->addWidget(m_connectDisconnectButton);
 
 	m_localFileToUploadLabel = new QLabel("Upload file");
@@ -705,7 +722,8 @@ TreeViewWidget::TreeViewWidget() {
 
 	//Add all widgets to layout
 	horizontalLayoutTreeView->addWidget(m_treeView);
-	horizontalLayoutTreeView->addWidget(m_treeWidget);
+	//horizontalLayoutTreeView->addWidget(m_treeWidget);
+	horizontalLayoutTreeView->addWidget(m_remoteTreeView);
 	verticalLayout->addLayout(horizontalLayoutUserCredentials);
 	verticalLayout->addLayout(horizontalLayoutUploadDownloadParameters);
 	verticalLayout->addLayout(horizontalLayoutTreeView);
@@ -736,45 +754,8 @@ TreeViewWidget::TreeViewWidget() {
 }
 
 void TreeViewWidget::populateTreeView() {
-	m_treeWidget->clear();
-	auto& cache = m_manager.getCache();
-	for (const auto& pair : cache) {
-		const QString path = QString::fromStdString(pair.first);
-		const auto& entries = pair.second;
-		QTreeWidgetItem* root = findOrCreateRoot(path);
-
-		for (const auto& entry : entries) {
-			if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
-				continue;
-			}
-
-			QString entryName = QString::fromStdString(entry.m_name);
-			QDateTime dateTime = parseDateString(entry.m_lastModified);
-			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
-			QString permissions = QString::fromStdString(entry.m_permissions);
-			QString owner = QString::fromStdString(entry.m_owner);
-
-			QTreeWidgetItem* item = new QTreeWidgetItem(root);
-			item->setText(0, entryName);
-			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
-			item->setText(3, formattedDate);
-			item->setText(4, permissions);
-			item->setText(5, owner);
-
-			if (entry.m_isDirectory) {
-				item->setIcon(0, getDirectoryIcon());
-				item->setData(0, Qt::UserRole, true);
-			}
-			else {
-				item->setText(1, convertSize(entry.m_totalBytes));
-				item->setIcon(0, getFileIcon());
-				item->setData(0, Qt::UserRole, false);
-			}
-
-			root->addChild(item);
-		}
-		root->setData(0, Qt::UserRole + 1, true);
-	}
+	auto cache = m_manager.getCache();
+	m_fileModel->populateFileSystem(cache);
 }
 
 void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
@@ -853,7 +834,7 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		}
 
 		if (!entry.m_isDirectory) {
-			QString sizeText = convertSize(entry.m_totalBytes);
+			QString sizeText = Commons::convertSize(entry.m_totalBytes);
 			if (item->text(1) != sizeText) {
 				item->setText(1, sizeText);
 			}
@@ -937,7 +918,7 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		}
 
 		if (!entry.m_isDirectory) {
-			QString sizeText = convertSize(entry.m_totalBytes);
+			QString sizeText = Commons::convertSize(entry.m_totalBytes);
 			if (item->text(1) != sizeText) {
 				item->setText(1, sizeText);
 			}
@@ -1040,7 +1021,7 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 		}
 
 		if (!entry.m_isDirectory) {
-			QString sizeText = convertSize(entry.m_totalBytes);
+			QString sizeText = Commons::convertSize(entry.m_totalBytes);
 			if (item->text(1) != sizeText) {
 				item->setText(1, sizeText);
 			}
@@ -1056,6 +1037,74 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 	root->setData(0, Qt::UserRole + 1, true);
 
 	m_treeWidget->setUpdatesEnabled(true);
+}
+
+void TreeViewWidget::onCaptureExpandedState() {
+	m_expandedPaths.clear();
+	QModelIndex rootIndex = m_remoteTreeView->rootIndex();
+	captureExpandedState(rootIndex);
+}
+
+void TreeViewWidget::onRestoreExpandedState() {
+	QModelIndex rootIndex = m_remoteTreeView->rootIndex();
+	restoreExpandedState(rootIndex);
+}
+
+void TreeViewWidget::captureExpandedState(const QModelIndex& index) {
+	if (!index.isValid()) return;
+
+	if (m_remoteTreeView->isExpanded(index)) {
+		FileInfo* item = static_cast<FileInfo*>(index.internalPointer());
+		if (item && item->isDirectory) {
+			m_expandedPaths.append(item->uniqueId);
+		}
+		int rowCount = m_fileModel->rowCount(index);
+		for (int row = 0; row < rowCount; ++row) {
+			QModelIndex childIndex = m_fileModel->index(row, 0, index);
+			captureExpandedState(childIndex);
+		}
+	}
+}
+
+void TreeViewWidget::restoreExpandedState(const QModelIndex& index) {
+	if (!index.isValid()) return;
+
+	FileInfo* item = static_cast<FileInfo*>(index.internalPointer());
+	if (item && item->isDirectory && m_expandedPaths.contains(item->uniqueId)) {
+		m_remoteTreeView->setExpanded(index, true);
+		int rowCount = m_fileModel->rowCount(index);
+		for (int row = 0; row < rowCount; ++row) {
+			QModelIndex childIndex = m_fileModel->index(row, 0, index);
+			restoreExpandedState(childIndex);
+		}
+	}
+}
+
+FileInfo* TreeViewWidget::findOrCreateDirectory(FileInfo& root, const QString& path) {
+	QStringList pathParts = path.split("/", Qt::SkipEmptyParts); // Split the path into parts
+	FileInfo* current = &root;
+
+	for (const auto& part : pathParts) {
+		// Check if the part already exists as a child directory
+		auto it = std::find_if(current->children.begin(), current->children.end(),
+			[&part](const FileInfo& child) { return child.name == part && child.isDirectory; });
+
+		if (it != current->children.end()) {
+			current = &(*it); // Directory exists, move to it
+		}
+		else {
+			// Create a new directory
+			FileInfo newDir;
+			newDir.name = part;
+			newDir.isDirectory = true;
+			newDir.parent = current;
+
+			current->children.append(newDir);
+			current = &current->children.last(); // Move to the newly created directory
+		}
+	}
+
+	return current;
 }
 
 QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
@@ -1112,7 +1161,6 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 	}
 
 	if (!currentItem) {
-		//textDebugLog.append("The starting path for: " + path + " was not found in the tree.");
 		logger().error() << "The starting path for: '" << path.toStdString() << "' was not found in the directory tree.";
 		return;
 	}
@@ -1151,7 +1199,6 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 					}
 				}
 				if (!found) {
-					//m_textDebugLog.append("The path " + currentPath + " was not found in the tree.");
 					logger().error() << "The path for: '" << currentPath.toStdString() << "' was not found in the directory tree.";
 					return;
 				}
