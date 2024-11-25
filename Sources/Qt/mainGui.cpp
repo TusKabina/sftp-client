@@ -244,10 +244,8 @@ void deleteTreeItems(QTreeWidgetItem* item) {
 
 void TreeViewWidget::onConnectButtonClicked() {
 	if (m_isConnected) {
-		// Disconnect logic
 		m_manager.reset();
 
-		// Clear the model by resetting its root
 		FileInfo emptyRoot;
 		m_fileModel->setRoot(emptyRoot);
 
@@ -756,6 +754,7 @@ TreeViewWidget::TreeViewWidget() {
 void TreeViewWidget::populateTreeView() {
 	auto cache = m_manager.getCache();
 	m_fileModel->populateFileSystem(cache);
+	m_fileModel->printUniqueIds();
 }
 
 void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
@@ -1102,9 +1101,9 @@ FileInfo* TreeViewWidget::findOrCreateDirectory(FileInfo& root, const QString& p
 			current->children.append(newDir);
 			current = &current->children.last(); // Move to the newly created directory
 		}
+		return current;
 	}
 
-	return current;
 }
 
 QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {

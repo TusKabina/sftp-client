@@ -42,11 +42,13 @@ public:
     void assignParentPointers(FileInfo* parent);
     void populateFileSystem(const std::map<std::string, std::vector<DirectoryEntry>>& cache);
 
+   void printUniqueIds() const;
+
 private:
     FileInfo m_root;
-    QList<QPersistentModelIndex> m_expandedEntries;
     FileInfo* getItem(const QModelIndex& index) const;
     FileInfo* findOrCreateDirectory(FileInfo& root, const QString& path);
+    void printUniqueIdsRecursively(const FileInfo& node, int depth) const;
 
 signals:
     void beginRefreshModel();

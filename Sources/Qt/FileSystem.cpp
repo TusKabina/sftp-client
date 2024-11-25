@@ -17,7 +17,7 @@ void FileSystem::populateFileSystem(const std::map<std::string, std::vector<Dire
     m_root = FileInfo();
     m_root.name = "/";
     m_root.isDirectory = true;
-
+    m_root.uniqueId = "/";
     for (const auto& [path, entries] : cache) {
         FileInfo* parentDir = (path == "/") ? &m_root : findOrCreateDirectory(m_root, QString::fromStdString(path));
 
@@ -34,13 +34,22 @@ void FileSystem::populateFileSystem(const std::map<std::string, std::vector<Dire
             child.permissions = QString::fromStdString(entry.m_permissions);
             child.owner = QString::fromStdString(entry.m_owner);
             child.parent = parentDir;
-            child.uniqueId = parentDir->uniqueId + "/" + child.name;
+           
+            if (parentDir->uniqueId == "/") {
+                child.uniqueId = "/" + child.name;
+            }
+            else {
+                child.uniqueId = parentDir->uniqueId + "/" + child.name;
+            }
 
+            
             parentDir->children.append(child);
+
         }
     }
     endResetModel();
 }
+
 
 void FileSystem::setRoot(const FileInfo& rootData) {
     beginResetModel();
@@ -155,7 +164,9 @@ int FileSystem::columnCount(const QModelIndex&) const {
 }
 
 QVariant FileSystem::data(const QModelIndex& index, int role) const {
-    if (!index.isValid()) return QVariant();
+    if (!index.isValid()) {
+        return QVariant();
+    }
 
     FileInfo* item = getItem(index);
     switch (role) {
@@ -198,8 +209,7 @@ FileInfo* FileSystem::getItem(const QModelIndex& index) const {
     return index.isValid() ? static_cast<FileInfo*>(index.internalPointer()) : nullptr;
 }
 
-FileInfo* FileSystem::findOrCreateDirectory(FileInfo& root, const QString& path)
-{
+FileInfo* FileSystem::findOrCreateDirectory(FileInfo& root, const QString& path) {
     QStringList pathParts = path.split("/", Qt::SkipEmptyParts);
     FileInfo* current = &root;
     QString currentPath = current->uniqueId;
@@ -222,7 +232,22 @@ FileInfo* FileSystem::findOrCreateDirectory(FileInfo& root, const QString& path)
 
             current->children.append(newDir);
             current = &current->children.last();
+
         }
-        return current;
     }
+    return current;
+}
+
+void FileSystem::printUniqueIdsRecursively(const FileInfo& node, int depth) const {
+    std::string indent(depth * 2, ' ');
+    logger().info() << indent << "Unique ID: " << node.uniqueId.toStdString();
+
+    for (const auto& child : node.children) {
+        printUniqueIdsRecursively(child, depth + 1);
+    }
+}
+
+
+void FileSystem::printUniqueIds() const {
+    printUniqueIdsRecursively(m_root, 0);
 }
