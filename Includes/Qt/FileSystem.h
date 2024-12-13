@@ -13,7 +13,7 @@ struct FileInfo {
     bool isDirectory;
     bool created = false;
     QString size;
-    QString lastModified;
+    QString lastModified; // TODO: delete
     time_t tLastModifiedTime;
     QString permissions;
     QString owner;
@@ -32,7 +32,7 @@ class FileSystem : public QAbstractItemModel {
 public:
     explicit FileSystem(QObject* parent = nullptr);
     void setRoot(const FileInfo& rootData);
-   // void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
+    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex& index) const override;
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -49,10 +49,6 @@ private:
     FileInfo* getItem(const QModelIndex& index) const;
     FileInfo* findOrCreateDirectory(FileInfo& root, const QString& path);
     void printUniqueIdsRecursively(const FileInfo& node, int depth) const;
-
-signals:
-    void beginRefreshModel();
-    void endRefreshModel();
 };
 
 #endif // SFTP_CLIENT_FILESYSTEM_H

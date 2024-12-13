@@ -81,9 +81,12 @@ public:
 	void populateTreeWidgetViewDirectory(QTreeWidgetItem* parentItem, const QString& path);
 	void onCaptureExpandedState();
 	void onRestoreExpandedState();
-	void captureExpandedState(const QModelIndex& index);
+	void onLayoutAboutToBeChanged();
+	void onItemExpanded(const QModelIndex& index);
+	void onItemCollapsed(const QModelIndex& index);
 	void restoreExpandedState(const QModelIndex& index);
 
+	QModelIndex getIndex(const QString& uniqueId, FileSystem* model, const QModelIndex& parent);
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
 private:
@@ -94,6 +97,8 @@ private:
 	TreeView* m_treeView;
 	QTreeView* m_remoteTreeView;
 	FileSystem* m_fileModel;
+	QSet<QString> m_expandedIds;
+
 	TreeWidget* m_treeWidget;
 
 	QLabel* m_sftpServerNameLabel;

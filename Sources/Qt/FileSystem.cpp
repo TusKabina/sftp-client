@@ -22,7 +22,7 @@ void FileSystem::populateFileSystem(const std::map<std::string, std::vector<Dire
         FileInfo* parentDir = (path == "/") ? &m_root : findOrCreateDirectory(m_root, QString::fromStdString(path));
 
         for (const auto& entry : entries) {
-            if (entry.m_name == "." || entry.m_name == "..") {
+            if (entry.m_name == "." || entry.m_name == ".." || entry.m_isSymLink) {
                 continue;
             }
 
@@ -63,53 +63,51 @@ void FileSystem::setRoot(const FileInfo& rootData) {
     endResetModel();
 }
 
-//void FileSystem::sort(int column, Qt::SortOrder order) {
-//    layoutAboutToBeChanged();
-//    emit beginRefreshModel();
-//    auto comparator = [column, order](const FileInfo& a, const FileInfo& b) {
-//        int result = 0;
-//
-//        switch (column) {
-//        case 0: // Name
-//            result = QString::compare(a.name, b.name, Qt::CaseInsensitive);
-//            break;
-//        case 1: // Size
-//            result = a.size.toULongLong() < b.size.toULongLong() ? -1 :
-//                (a.size.toULongLong() > b.size.toULongLong() ? 1 : 0);
-//            break;
-//        case 2: // Type
-//            result = a.isDirectory == b.isDirectory ? 0 : (a.isDirectory ? -1 : 1);
-//            break;
-//        case 3: // Date Modified
-//            result = a.tLastModifiedTime < b.tLastModifiedTime ? -1 :
-//                (a.tLastModifiedTime > b.tLastModifiedTime ? 1 : 0);
-//            break;
-//        case 4: // Permissions
-//            result = QString::compare(a.permissions, b.permissions, Qt::CaseInsensitive);
-//            break;
-//        case 5: // Owner
-//            result = QString::compare(a.owner, b.owner, Qt::CaseInsensitive);
-//            break;
-//        }
-//
-//        return (order == Qt::AscendingOrder) ? result < 0 : result > 0;
-//    };
-//
-//    std::function<void(FileInfo&)> sortChildren = [&comparator, &sortChildren](FileInfo& parent) {
-//        std::sort(parent.children.begin(), parent.children.end(), comparator);
-//
-//        for (auto& child : parent.children) {
-//            child.parent = &parent;
-//            if (child.isDirectory) {
-//                sortChildren(child);
-//            }
-//        }
-//    };
-//
-//    sortChildren(m_root);
-//    layoutChanged();
-//    emit endRefreshModel();
-//}
+void FileSystem::sort(int column, Qt::SortOrder order) {
+    layoutAboutToBeChanged();
+    auto comparator = [column, order](const FileInfo& a, const FileInfo& b) {
+        int result = 0;
+
+        switch (column) {
+        case 0: // Name
+            result = QString::compare(a.name, b.name, Qt::CaseInsensitive);
+            break;
+        case 1: // Size
+            result = a.size.toULongLong() < b.size.toULongLong() ? -1 :
+                (a.size.toULongLong() > b.size.toULongLong() ? 1 : 0);
+            break;
+        case 2: // Type
+            result = a.isDirectory == b.isDirectory ? 0 : (a.isDirectory ? -1 : 1);
+            break;
+        case 3: // Date Modified
+            result = a.tLastModifiedTime < b.tLastModifiedTime ? -1 :
+                (a.tLastModifiedTime > b.tLastModifiedTime ? 1 : 0);
+            break;
+        case 4: // Permissions
+            result = QString::compare(a.permissions, b.permissions, Qt::CaseInsensitive);
+            break;
+        case 5: // Owner
+            result = QString::compare(a.owner, b.owner, Qt::CaseInsensitive);
+            break;
+        }
+
+        return (order == Qt::AscendingOrder) ? result < 0 : result > 0;
+    };
+
+    std::function<void(FileInfo&)> sortChildren = [&comparator, &sortChildren](FileInfo& parent) {
+        std::sort(parent.children.begin(), parent.children.end(), comparator);
+
+        for (auto& child : parent.children) {
+            child.parent = &parent;
+            if (child.isDirectory) {
+                sortChildren(child);
+            }
+        }
+    };
+
+    sortChildren(m_root);
+    layoutChanged();
+}
 
 QModelIndex FileSystem::index(int row, int column, const QModelIndex& parent) const {
     if (!hasIndex(row, column, parent)) {
@@ -215,7 +213,13 @@ FileInfo* FileSystem::findOrCreateDirectory(FileInfo& root, const QString& path)
     QString currentPath = current->uniqueId;
 
     for (const auto& part : pathParts) {
-        currentPath += "/" + part;
+        if (current->uniqueId == "/") {
+            currentPath = "/" + part;
+
+        }
+        else {
+            currentPath = current->uniqueId + "/" + part;
+        }
 
         auto it = std::find_if(current->children.begin(), current->children.end(),
             [&part](const FileInfo& child) { return child.name == part && child.isDirectory; });

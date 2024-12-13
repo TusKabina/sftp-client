@@ -390,7 +390,8 @@ void TreeViewWidget::onPasteAction() {
 void TreeViewWidget::onLogLevelChanged(int index) {
 	LogLevel selectedLogLevel = static_cast<LogLevel>(m_logLevelComboBox->currentData().toInt());
 	Logger::instance().setLogLevel(selectedLogLevel);
-	logger().critical() << "Log level changed to: " << logLevelToString(static_cast<LogLevel>(selectedLogLevel));
+
+	logger().critical() << "Log level changed to: " << logLevelToString(selectedLogLevel);
 }
 
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
@@ -582,12 +583,16 @@ TreeViewWidget::TreeViewWidget() {
 	m_treeView->viewport()->setAcceptDrops(true);
 	m_treeView->setDropIndicatorShown(true);
 	m_treeView->setDragDropMode(QAbstractItemView::DragDrop);
-	connect(m_treeView, SIGNAL(clicked(const QModelIndex&)),
-		this, SLOT(onClickedTreeView(const QModelIndex&)));
-	connect(m_treeView, SIGNAL(RightClickAction(QMouseEvent*)),
-		this, SLOT(onRightClickedAction(QMouseEvent*)));
-	m_treeView->setModel(dirModel);
+
+	connect(m_treeView, SIGNAL(clicked(const QModelIndex&)),this, SLOT(onClickedTreeView(const QModelIndex&)));
+	connect(m_treeView, SIGNAL(RightClickAction(QMouseEvent*)),this, SLOT(onRightClickedAction(QMouseEvent*)));
+
+	
+
+
 	QModelIndex idx = dirModel->index("/");
+	
+	m_treeView->setModel(dirModel);
 	m_treeView->setRootIndex(idx);
 	m_treeView->setSortingEnabled(true);
 	m_treeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -633,8 +638,13 @@ TreeViewWidget::TreeViewWidget() {
 	m_fileModel = new FileSystem(this);
 	m_remoteTreeView->setModel(m_fileModel);
 
-	connect(m_fileModel, &FileSystem::beginRefreshModel, this, &TreeViewWidget::onCaptureExpandedState);
-	connect(m_fileModel, &FileSystem::endRefreshModel, this, &TreeViewWidget::onRestoreExpandedState);
+	//connect(m_fileModel, &FileSystem::beginRefreshModel, this, &TreeViewWidget::onCaptureExpandedState);
+
+	connect(m_remoteTreeView, &QTreeView::expanded, this, &TreeViewWidget::onItemExpanded);
+	connect(m_remoteTreeView, &QTreeView::collapsed, this, &TreeViewWidget::onItemCollapsed);
+	//connect(m_fileModel, &FileSystem::endRefreshModel, this, &TreeViewWidget::onRestoreExpandedState);
+	connect(m_fileModel, &FileSystem::layoutAboutToBeChanged, this, &TreeViewWidget::onLayoutAboutToBeChanged);
+	connect(m_fileModel, &FileSystem::layoutChanged, this, &TreeViewWidget::onRestoreExpandedState);
 
 	// Connect signals
 	//connect(m_remoteTreeView, &QTreeView::clicked, this, &TreeViewWidget::processTreeWidgetItemClicked);
@@ -743,7 +753,9 @@ TreeViewWidget::TreeViewWidget() {
 	m_transferStatusWidget->setSortingEnabled(true);
 
 	verticalLayout->addWidget(m_transferStatusWidget);
+	
 	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
+	
 	//Set vertical layout as main layout
 	setLayout(verticalLayout);
 
@@ -1038,43 +1050,80 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 	m_treeWidget->setUpdatesEnabled(true);
 }
 
-void TreeViewWidget::onCaptureExpandedState() {
-	m_expandedPaths.clear();
-	QModelIndex rootIndex = m_remoteTreeView->rootIndex();
-	captureExpandedState(rootIndex);
-}
+
 
 void TreeViewWidget::onRestoreExpandedState() {
-	QModelIndex rootIndex = m_remoteTreeView->rootIndex();
-	restoreExpandedState(rootIndex);
+	m_remoteTreeView->collapseAll();
+
+	for (const QString& id : m_expandedIds) {
+		QModelIndex idx = getIndex(id, m_fileModel, QModelIndex());
+		if (idx.isValid()) {
+			m_remoteTreeView->expand(idx);
+		}
+		logger().debug() << "Expanding item: " << id;
+	}
+
+	m_remoteTreeView->blockSignals(false);
 }
 
-void TreeViewWidget::captureExpandedState(const QModelIndex& index) {
-	if (!index.isValid()) return;
+void TreeViewWidget::onLayoutAboutToBeChanged() {
+	logger().debug() << "Layout about to be changed....";
+	m_remoteTreeView->blockSignals(true);
+}
 
-	if (m_remoteTreeView->isExpanded(index)) {
-		FileInfo* item = static_cast<FileInfo*>(index.internalPointer());
-		if (item && item->isDirectory) {
-			m_expandedPaths.append(item->uniqueId);
-		}
-		int rowCount = m_fileModel->rowCount(index);
-		for (int row = 0; row < rowCount; ++row) {
-			QModelIndex childIndex = m_fileModel->index(row, 0, index);
-			captureExpandedState(childIndex);
-		}
+void TreeViewWidget::onItemExpanded(const QModelIndex& index) {
+	if (!index.isValid()) {
+		return;
+	}
+	FileInfo* fileInfo = static_cast<FileInfo*>(index.internalPointer());
+	if (fileInfo) {
+		m_expandedIds.insert(fileInfo->uniqueId);
+		logger().debug() << "Inserted ID: " << fileInfo->uniqueId;
+	}
+	
+}
+
+void TreeViewWidget::onItemCollapsed(const QModelIndex& index) {
+	if (!index.isValid()) {
+		return;
+	}
+	FileInfo* fileInfo = static_cast<FileInfo*>(index.internalPointer());
+	if (fileInfo) {
+		m_expandedIds.remove(fileInfo->uniqueId);
+		logger().debug() << "Removed ID: " << fileInfo->uniqueId;
 	}
 }
 
-void TreeViewWidget::restoreExpandedState(const QModelIndex& index) {
-	if (!index.isValid()) return;
+QModelIndex TreeViewWidget::getIndex(const QString& uniqueId, FileSystem* model, const QModelIndex& parent) {
+	int rowCount = model->rowCount(parent);
+	for (int i = 0; i < rowCount; i++) {
+		QModelIndex childIndex = model->index(i, 0, parent);
+		if (!childIndex.isValid()) {
+			continue;
+		}
 
-	FileInfo* item = static_cast<FileInfo*>(index.internalPointer());
-	if (item && item->isDirectory && m_expandedPaths.contains(item->uniqueId)) {
-		m_remoteTreeView->setExpanded(index, true);
-		int rowCount = m_fileModel->rowCount(index);
-		for (int row = 0; row < rowCount; ++row) {
-			QModelIndex childIndex = m_fileModel->index(row, 0, index);
-			restoreExpandedState(childIndex);
+		FileInfo* fileInfo = static_cast<FileInfo*>(childIndex.internalPointer());
+
+		if (fileInfo && fileInfo->uniqueId == uniqueId) {
+			return childIndex;
+		}
+
+		if (fileInfo && fileInfo->isDirectory) {
+			QModelIndex found = getIndex(uniqueId, model, childIndex);
+			if (found.isValid()) {
+				return found;
+			}
+		}
+	}
+	return QModelIndex();
+}
+
+void TreeViewWidget::restoreExpandedState(const QModelIndex& index) {
+	for (const QString& id : m_expandedIds) {
+		QModelIndex idx = getIndex(id, m_fileModel, QModelIndex());
+
+		if (idx.isValid()) {
+			m_remoteTreeView->expand(idx);
 		}
 	}
 }
