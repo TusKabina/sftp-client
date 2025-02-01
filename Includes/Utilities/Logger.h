@@ -6,7 +6,8 @@
 #include <QMutex>
 #include <QMap>
 #include <sstream>
-
+#include <qtextstream.h>
+#include <iostream>
 enum LogLevel {
 	Debug,
 	Info,
@@ -38,14 +39,19 @@ public:
         LogStream(LogStream&& other) noexcept;
         LogStream& operator=(LogStream&& other) noexcept;
 
+        LogLevel logLevel() { return m_level; }
+
 
         template <typename T>
         LogStream& operator<<(const T& value) {
-            m_stream << value;
+            //m_stream << value;
+            m_qStream << value;
             return *this;
         }
 
         LogStream& operator<<(std::ostream& (*manip)(std::ostream&));
+        
+        LogStream& operator<<(const std::string& value);
 
         void flush();
 
@@ -55,7 +61,10 @@ public:
         Logger& m_logger;
         LogLevel m_level;
         std::stringstream m_stream;
+        QTextStream m_qStream;
+        QString m_buffer;
         bool m_flushed = false;
+        
     };
 
     LogStream debug();
@@ -82,8 +91,8 @@ private:
 
 Logger& logger();
 
-static const std::string logLevelToString(LogLevel logLevel) {
-    std::string strLogLevel;
+static const QString logLevelToString(LogLevel logLevel) {
+    QString strLogLevel;
 
     switch (logLevel)
     {

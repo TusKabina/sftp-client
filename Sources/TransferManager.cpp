@@ -51,6 +51,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
    
    if (job == m_transferJobs.end()) {
        std::cout << "JOB NOT FOUND" << std::endl;
+       logger().critical() << "Job with job ID: " << jobId << "Not found!";
        return;
    }
     std::string localDirPath = (*job)->getLocalDirectoryPath() + "/";

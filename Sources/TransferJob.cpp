@@ -334,6 +334,7 @@ void TransferJob::createDirectory(const std::string& path) {
             m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
             m_transferHandle.m_transferStatus.m_errorMessage = "[DELETE] Delete file: " + m_transferFile.m_remotePath + " completed.";
             logger().info() << "Successfully created a directory. Path: " << path;
+
             //onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
         }
         curl_slist_free_all(header);
