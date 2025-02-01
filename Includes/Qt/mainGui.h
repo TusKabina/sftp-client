@@ -24,6 +24,7 @@
 #include <QMimeData>
 #include <QIcon>
 #include <qcombobox.h>
+#include <QScrollBar>
 #include "Qt/FileSystem.h"
 #include "Utilities/Commons.h"
 
@@ -96,6 +97,8 @@ private:
 private:
 	TreeView* m_treeView;
 	QTreeView* m_remoteTreeView;
+	int m_savedVerticalPos = 0;
+	int m_savedHorizontalPos = 0;
 	FileSystem* m_fileModel;
 	QSet<QString> m_expandedIds;
 

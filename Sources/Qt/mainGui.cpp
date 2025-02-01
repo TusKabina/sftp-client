@@ -263,8 +263,8 @@ void TreeViewWidget::onConnectButtonClicked() {
 	std::string username = m_sftpUserNameLineEdit->text().toStdString();
 	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();
 
-	logger().info() << "Connecting to host: " << host;
-	logger().info() << "Username: " << username;
+	/*logger().info() << "Connecting to host: " << host;
+	logger().info() << "Username: " << username;*/
 
 	m_manager.connect(host, username, password);
 	m_isConnected = m_manager.isInitialized();
@@ -391,7 +391,7 @@ void TreeViewWidget::onLogLevelChanged(int index) {
 	LogLevel selectedLogLevel = static_cast<LogLevel>(m_logLevelComboBox->currentData().toInt());
 	Logger::instance().setLogLevel(selectedLogLevel);
 
-	logger().critical() << "Log level changed to: " << logLevelToString(selectedLogLevel);
+	//logger().critical() << "Log level changed to: " << logLevelToString(selectedLogLevel);
 }
 
 void TreeViewWidget::onClickedTreeView(const QModelIndex& index) {
@@ -619,10 +619,6 @@ TreeViewWidget::TreeViewWidget() {
 	//connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
 	//	this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
 
-	//const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
-	//connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
-	//		this->onDirectoryCacheUpdated(path);
-	//	});
 
 	// Tree view for remote machine files
 	m_remoteTreeView = new QTreeView(this);
@@ -645,6 +641,12 @@ TreeViewWidget::TreeViewWidget() {
 	//connect(m_fileModel, &FileSystem::endRefreshModel, this, &TreeViewWidget::onRestoreExpandedState);
 	connect(m_fileModel, &FileSystem::layoutAboutToBeChanged, this, &TreeViewWidget::onLayoutAboutToBeChanged);
 	connect(m_fileModel, &FileSystem::layoutChanged, this, &TreeViewWidget::onRestoreExpandedState);
+
+	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
+	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated,this, [this](const std::string& path) {
+		auto entries = m_manager.getDirectoryList(path);
+		m_fileModel->refreshDirectory(path, entries);
+	});
 
 	// Connect signals
 	//connect(m_remoteTreeView, &QTreeView::clicked, this, &TreeViewWidget::processTreeWidgetItemClicked);
@@ -1064,10 +1066,14 @@ void TreeViewWidget::onRestoreExpandedState() {
 	}
 
 	m_remoteTreeView->blockSignals(false);
+	m_remoteTreeView->verticalScrollBar()->setValue(m_savedVerticalPos);
+	m_remoteTreeView->horizontalScrollBar()->setValue(m_savedHorizontalPos);
 }
 
 void TreeViewWidget::onLayoutAboutToBeChanged() {
 	logger().debug() << "Layout about to be changed....";
+	m_savedVerticalPos = m_remoteTreeView->verticalScrollBar()->value();
+	m_savedHorizontalPos = m_remoteTreeView->horizontalScrollBar()->value();
 	m_remoteTreeView->blockSignals(true);
 }
 

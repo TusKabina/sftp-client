@@ -14,10 +14,12 @@ void FileSystem::assignParentPointers(FileInfo* parent) {
 
 void FileSystem::populateFileSystem(const std::map<std::string, std::vector<DirectoryEntry>>& cache) {
     beginResetModel();
+
     m_root = FileInfo();
     m_root.name = "/";
     m_root.isDirectory = true;
     m_root.uniqueId = "/";
+
     for (const auto& [path, entries] : cache) {
         FileInfo* parentDir = (path == "/") ? &m_root : findOrCreateDirectory(m_root, QString::fromStdString(path));
 
@@ -47,12 +49,230 @@ void FileSystem::populateFileSystem(const std::map<std::string, std::vector<Dire
 
         }
     }
+
     endResetModel();
 }
 
+void FileSystem::refreshDirectory(const std::string& path, const std::vector<DirectoryEntry>& entries) {
+    // TODO: This deleting of '/' if it is the last character needs to be redesigned, it will become spaghetti code....
+    QString qPath;
+    if (path != "/") {
+        QString qPath = QString::fromStdString(path.substr(0, path.size() - 1));
+    }
+    else {
+        qPath = QString::fromStdString(path);
+    }
+
+    FileInfo* dirNode = findNode(qPath);
+    if (!dirNode) {
+        logger().error() << "Cannot find directory node for path: " << path;
+        return;
+    }
+    logger().debug() << "\n=== Start Refresh ===";
+    logger().debug() << "Path: " << path;
+    logger().debug() << "Current number of children: " << dirNode->children.size();
+    logger().debug() << "Number of new entries: " << entries.size();
+
+    std::cout << "\n=== Start Refresh ===" << std::endl;
+    std::cout << "Path: " << path << std::endl;
+    std::cout << "Current number of children: " << dirNode->children.size() << std::endl;
+    std::cout << "Number of new entries: " << entries.size() << std::endl;
+    // Get the model index for this directory
+    QModelIndex dirIndex;
+    if (dirNode == &m_root) {
+        dirIndex = QModelIndex();
+    }
+    else {
+        int row = 0;
+        if (dirNode->parent) {
+            row = dirNode->parent->children.indexOf(*dirNode);
+            if (row < 0) {
+                logger().error() << "Invalid parent-child relationship detected";
+                return;
+            }
+        }
+        dirIndex = createIndex(row, 0, dirNode);
+    }
+
+    QVector<int> added;
+    QVector<int> removed;
+    QVector<int> modified;
+
+    QHash<QString, int> existingChildren;
+    for (int i = 0; i < dirNode->children.size(); ++i) {
+        existingChildren[dirNode->children[i].name] = i;
+    }
+
+    QList<FileInfo> newChildren;
+    for (const auto& entry : entries) {
+        if (entry.m_name == "." || entry.m_name == ".." || entry.m_isSymLink) {
+            continue;
+        }
+
+        QString entryName = QString::fromStdString(entry.m_name);
+        FileInfo newInfo;
+        newInfo.name = entryName;
+        newInfo.isDirectory = entry.m_isDirectory;
+        newInfo.size = entry.m_isDirectory ? "" : Commons::convertSize(entry.m_totalBytes);
+        newInfo.tLastModifiedTime = entry.m_tLastModified;
+        newInfo.permissions = QString::fromStdString(entry.m_permissions);
+        newInfo.owner = QString::fromStdString(entry.m_owner);
+        newInfo.parent = dirNode;
+        newInfo.uniqueId = dirNode->uniqueId == "/" ?
+            "/" + entryName : dirNode->uniqueId + "/" + entryName;
+
+        auto existingIt = existingChildren.find(entryName);
+        if (existingIt == existingChildren.end()) {
+            added.append(newChildren.size());
+        }
+        else {
+            int existingIndex = *existingIt;
+            if (existingIndex >= 0 && existingIndex < dirNode->children.size()) {
+                const FileInfo& existing = dirNode->children[existingIndex];
+                if (existing.size != newInfo.size ||
+                    existing.tLastModifiedTime != newInfo.tLastModifiedTime ||
+                    existing.permissions != newInfo.permissions ||
+                    existing.owner != newInfo.owner) {
+                    modified.append(existingIndex);
+                }
+                // Preserve existing children for directories
+                if (existing.isDirectory) {
+                    newInfo.children = existing.children;
+                }
+            }
+            existingChildren.remove(entryName);
+        }
+        newChildren.append(newInfo);
+    }
+
+   
+
+    // Deleting remaining existingChildren which where not found
+    for (auto it = existingChildren.begin(); it != existingChildren.end(); ++it) {
+        if (*it >= 0 && *it < dirNode->children.size()) {
+            removed.append(*it);
+        }
+    }
+
+    logger().debug() << "Number of new children created: " << newChildren.size();
+    logger().debug() << "Added items: " << added.size();
+    logger().debug() << "Removed items: " << removed.size();
+    logger().debug() << "Modified items: " << modified.size();
+
+    std::cout << "Number of new children created: " << newChildren.size() << std::endl;
+    std::cout << "Added items: " << added.size() << std::endl;
+    std::cout << "Removed items: " << removed.size() << std::endl;
+    std::cout << "Modified items: " << modified.size() << std::endl;
+
+
+    if (added.isEmpty() && removed.isEmpty() && modified.isEmpty()) {
+        logger().debug() << "No changes detected in directory: " << path;
+        return;
+    }
+
+    // Fix parent pointers
+    for (auto& child : newChildren) {
+        child.parent = dirNode;
+        if (child.isDirectory && !child.children.isEmpty()) {
+            std::function<void(FileInfo&)> fixParents = [&fixParents](FileInfo& node) {
+                for (auto& child : node.children) {
+                    child.parent = &node;
+                    if (child.isDirectory && !child.children.isEmpty()) {
+                        fixParents(child);
+                    }
+                }
+            };
+            fixParents(child);
+        }
+    }
+
+    if (!added.isEmpty() || !removed.isEmpty()) {
+        logger().debug() << "About to assign new children";
+        logger().debug() << "Old children count: " << dirNode->children.size();
+        logger().debug() << "New children count: " << newChildren.size();
+
+        std::cout << "About to assign new children" << std::endl;
+        std::cout << "Old children count: " << dirNode->children.size() << std::endl;
+        std::cout << "New children count: " << newChildren.size() << std::endl;
+    }
+
+    if (!removed.isEmpty()) {
+        std::cout << "About to remove rows. Remove list: ";
+        for (int idx : removed) {
+            std::cout << idx << " ";
+            std::cout << "Item at index: " << dirNode->children[idx].name.toStdString() << " ";
+        }
+        std::cout << std::endl;
+
+        std::cout << "Current children before removal: " << std::endl;
+        for (int i = 0; i < dirNode->children.size(); i++) {
+            std::cout << i << ": " << dirNode->children[i].name.toStdString() << std::endl;
+        }
+    }
+
+    if (!removed.isEmpty()) {
+        std::sort(removed.begin(), removed.end());
+        beginRemoveRows(dirIndex, removed.first(), removed.last());
+        endRemoveRows();
+    }
+
+    if (!added.isEmpty()) {
+        std::sort(added.begin(), added.end());
+        beginInsertRows(dirIndex, added.first(), added.last());
+    }
+
+    if (removed.isEmpty() && added.isEmpty()) {
+        for (int idx : modified) {
+            if (idx >= 0 && idx < dirNode->children.size()) {
+                auto it = std::find_if(newChildren.begin(), newChildren.end(),[&](const FileInfo& info) { 
+                    return info.name == dirNode->children[idx].name; 
+                });
+
+                if (it != newChildren.end()) {
+                    dirNode->children[idx].size = it->size;
+                    dirNode->children[idx].tLastModifiedTime = it->tLastModifiedTime;
+                    dirNode->children[idx].permissions = it->permissions;
+                    dirNode->children[idx].owner = it->owner;
+                    QModelIndex modifiedIndex = index(idx, 0, dirIndex);
+                    emit dataChanged(modifiedIndex, index(idx, columnCount() - 1, dirIndex));
+                }
+
+            }
+        }
+    }
+    else {
+        dirNode->children = newChildren;
+    }
+
+    if (!added.isEmpty()) {
+        endInsertRows();
+    }
+
+    if (!modified.isEmpty()) {
+        for (int idx : modified) {
+            if (idx >= 0 && idx < dirNode->children.size()) {
+                QModelIndex modifiedIndex = index(idx, 0, dirIndex);
+                emit dataChanged(modifiedIndex, index(idx, columnCount() - 1, dirIndex));
+            }
+        }
+    }
+
+    logger().debug() << "=== End Refresh ===\n";
+    std::cout << "=== End Refresh ===\n" << std::endl;
+
+  /*  for (const auto& child : dirNode->children) {
+        std::cout << "Child: " << child.name.toStdString()
+            << " Parent: " << static_cast<void*>(child.parent) << std::endl;
+
+        logger().debug() << "Child: " << child.name.toStdString()
+            << " Parent: " << static_cast<void*>(child.parent);
+    }*/
+
+}
 
 void FileSystem::setRoot(const FileInfo& rootData) {
     beginResetModel();
+
     m_root = rootData;
 
     for (auto& child : m_root.children) {
@@ -65,6 +285,7 @@ void FileSystem::setRoot(const FileInfo& rootData) {
 
 void FileSystem::sort(int column, Qt::SortOrder order) {
     layoutAboutToBeChanged();
+
     auto comparator = [column, order](const FileInfo& a, const FileInfo& b) {
         int result = 0;
 
@@ -123,33 +344,69 @@ QModelIndex FileSystem::index(int row, int column, const QModelIndex& parent) co
 
 QModelIndex FileSystem::parent(const QModelIndex& index) const {
     if (!index.isValid()) {
+       // logger().debug() << "parent(): Invalid index";
+        std::cout << "parent(): Invalid index" << std::endl;
         return QModelIndex();
     }
 
     FileInfo* childItem = static_cast<FileInfo*>(index.internalPointer());
     if (!childItem || childItem == &m_root) {
-        return QModelIndex(); // Root has no parent
-    }
-
-    FileInfo* parentItem = childItem->parent;
-    if (!parentItem) {
-        return QModelIndex(); // top-level item
-    }
-
-    FileInfo* grandParentItem = parentItem->parent;
-    if (!grandParentItem) {
-        int row = m_root.children.indexOf(*parentItem);
-        return createIndex(row, 0, parentItem);
-    }
-
-    auto it = std::find(grandParentItem->children.begin(), grandParentItem->children.end(), *parentItem);
-    if (it == grandParentItem->children.end()) {
-        logger().error() << "Parent item not found in grandparent's children list.";
+        // logger().debug() << "parent(): Null child item or child is root";
+        std::cout << "parent(): Null child item or child is root" << std::endl;
         return QModelIndex();
     }
 
-    int row = std::distance(grandParentItem->children.begin(), it);
-    return createIndex(row, 0, parentItem);
+    //    logger().debug() << "parent(): Processing child: " << childItem->name.toStdString()
+      //  << " uniqueId: " << childItem->uniqueId.toStdString();
+    //std::cout << "parent(): Processing child: " << childItem->name.toStdString()
+     //   << " uniqueId: " << childItem->uniqueId.toStdString() << std::endl;
+
+    FileInfo* parentItem = childItem->parent;
+    if (!parentItem) {
+        //  logger().debug() << "parent(): Child has null parent: " << childItem->name.toStdString();
+        std::cout << "parent(): Child has null parent: " << childItem->name.toStdString() << std::endl;
+        return QModelIndex();
+    }
+
+    //    logger().debug() << "parent(): Parent is: " << parentItem->name.toStdString()
+    //    << " uniqueId: " << parentItem->uniqueId.toStdString();
+   // std::cout << "parent(): Parent is: " << parentItem->name.toStdString()
+     //   << " uniqueId: " << parentItem->uniqueId.toStdString() << std::endl;
+
+    // If parent is root, handle specially
+    if (parentItem == &m_root || parentItem->uniqueId == "/") {
+        std::cout << "parent(): Parent is root, searching for child position" << std::endl;
+        for (int i = 0; i < m_root.children.size(); ++i) {
+            if (m_root.children[i].uniqueId == childItem->uniqueId) {
+                std::cout << "parent(): Found child at position: " << i << std::endl;
+                return createIndex(i, 0, parentItem);
+            }
+        }
+        // logger().error() << "parent(): Child not found in root's children";
+        std::cout << "parent(): Child not found in root's children" << std::endl;
+        return QModelIndex();
+    }
+
+    // For non-root parents
+    FileInfo* grandParentItem = parentItem->parent;
+    if (!grandParentItem) {
+        // logger().error() << "parent(): Non-root parent has no grandparent";
+        std::cout << "parent(): Non-root parent has no grandparent" << std::endl;
+        return QModelIndex();
+    }
+
+    // Find parent's position in grandparent's children
+    for (int i = 0; i < grandParentItem->children.size(); ++i) {
+        if (grandParentItem->children[i].uniqueId == parentItem->uniqueId) {
+            //  logger().debug() << "parent(): Found parent at position: " << i;
+            std::cout << "parent(): Found parent at position: " << i << std::endl;
+            return createIndex(i, 0, parentItem);
+        }
+    }
+
+    //logger().error() << "parent(): Parent not found in grandparent's children";
+    std::cout << "parent(): Parent not found in grandparent's children" << std::endl;
+    return QModelIndex();
 }
 
 int FileSystem::rowCount(const QModelIndex& parent) const {
@@ -163,10 +420,25 @@ int FileSystem::columnCount(const QModelIndex&) const {
 
 QVariant FileSystem::data(const QModelIndex& index, int role) const {
     if (!index.isValid()) {
+        logger().debug() << "Invalid index in data()";
+        std::cout << "Invalid index in data()" << std::endl;
+        return QVariant();
+    }
+    
+    FileInfo* item = getItem(index);
+    if (!item) {
+        logger().debug() << "Null item in data() for index row:" << index.row()
+            << " column:" << index.column();
+        std::cout << "Null item in data() for index row:" << index.row()
+            << " column:" << index.column() << std::endl;
         return QVariant();
     }
 
-    FileInfo* item = getItem(index);
+    if (!item->parent) {
+        logger().debug() << "Item has null parent: " << item->name.toStdString();
+        std::cout << "Item has null parent: " << item->name.toStdString() << std::endl;
+    }
+
     switch (role) {
     case Qt::DisplayRole:
         switch (index.column()) {
@@ -244,11 +516,33 @@ FileInfo* FileSystem::findOrCreateDirectory(FileInfo& root, const QString& path)
 
 void FileSystem::printUniqueIdsRecursively(const FileInfo& node, int depth) const {
     std::string indent(depth * 2, ' ');
-    logger().info() << indent << "Unique ID: " << node.uniqueId.toStdString();
+   // logger().info() << indent << "Unique ID: " << node.uniqueId.toStdString();
 
     for (const auto& child : node.children) {
         printUniqueIdsRecursively(child, depth + 1);
     }
+}
+
+FileInfo* FileSystem::findNode(const QString& uniqueId) {
+    if (uniqueId == "/") {
+        return &m_root;
+    }
+
+    std::function<FileInfo* (FileInfo*, const QString&)> findRecursive =
+        [&findRecursive](FileInfo* current, const QString& id) -> FileInfo* {
+        if (current->uniqueId == id) {
+            return current;
+        }
+
+        for (auto& child : current->children) {
+            if (FileInfo* found = findRecursive(&child, id)) {
+                return found;
+            }
+        }
+        return nullptr;
+    };
+
+    return findRecursive(&m_root, uniqueId);
 }
 
 

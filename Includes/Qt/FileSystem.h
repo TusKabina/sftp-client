@@ -7,6 +7,7 @@
 #include <qtreeview.h>
 #include "DirectoryEntry.h"
 #include "Utilities/Commons.h"
+#include <qvector.h>
 
 struct FileInfo {
     QString name;
@@ -41,6 +42,10 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     void assignParentPointers(FileInfo* parent);
     void populateFileSystem(const std::map<std::string, std::vector<DirectoryEntry>>& cache);
+    void refreshDirectory(const std::string& path, const std::vector<DirectoryEntry>& entries);
+    void updateEntries(FileInfo* directory, const std::vector<DirectoryEntry>& entries);
+    void notifyUpdates(const QModelIndex& parent, const QVector<int>& added, const QVector<int>& removed,const QVector<int>& modified);
+    FileInfo* findNode(const QString& uniqueId);
 
    void printUniqueIds() const;
 
