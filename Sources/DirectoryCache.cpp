@@ -112,7 +112,7 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     }
     m_cache[path] = entries;
     for (const auto& entry : entries) {
-        if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != "." && entry.m_name != "mnt")) {
+        if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
             std::string subPath;
             subPath = path + entry.m_name + "/";
             prefetchDirectories(subPath, depth - 1);
