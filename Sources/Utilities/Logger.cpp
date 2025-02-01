@@ -8,9 +8,10 @@ Logger& logger() {
     return Logger::instance();
 }
 
-Logger::LogStream::LogStream(Logger& logger, LogLevel level) : m_logger(logger), m_level(level), m_flushed(false) {}
+Logger::LogStream::LogStream(Logger& logger, LogLevel level) : m_logger(logger), m_level(level), m_flushed(false), m_qStream(&m_buffer) {}
 
 Logger::LogStream::LogStream(Logger::LogStream&& other) noexcept : m_logger(other.m_logger), m_level(other.m_level), m_stream(std::move(other.m_stream)) {
+
     m_flushed = true;
 }
 
@@ -33,9 +34,14 @@ Logger::LogStream& Logger::LogStream::operator<<(std::ostream& (*manip)(std::ost
     return *this;
 }
 
+Logger::LogStream& Logger::LogStream::operator<<(const std::string& value) {
+    m_qStream << QString::fromStdString(value);
+    return *this;
+}
+
 void Logger::LogStream::flush() {
     if (!m_flushed) {
-        m_logger.log(QString::fromStdString(m_stream.str()), m_level);
+        m_logger.log(m_buffer, m_level);
         m_flushed = true;
     }
 }
@@ -115,7 +121,7 @@ void Logger::setLogLevel(LogLevel logLevel) {
 
 void Logger::log(const QString& message, LogLevel logLevel) {
     Logger& logger = Logger::instance();
-
+    
     if (logLevel < logger.m_logLevel) {
         return;
     }

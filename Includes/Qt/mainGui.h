@@ -24,6 +24,7 @@
 #include <QMimeData>
 #include <QIcon>
 #include <qcombobox.h>
+#include "Utilities/Commons.h"
 
 class TreeView : public QTreeView {
 	Q_OBJECT
@@ -127,6 +128,7 @@ private:
 	QMutex m_mutex;
 
 	QString m_sourcePath;
+	QList<QString> m_expandedPaths;
 	bool m_isCutOperation;
 	bool m_isConnected = false;
 

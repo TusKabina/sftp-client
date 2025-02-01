@@ -2,24 +2,13 @@
 #define SFTP_INTERFACE_DIRECTORYCACHE_H
 
 #include "HandleDeleter.h"
+#include "DirectoryEntry.h"
 #include <string>
 #include <vector>
 #include <map>
 #include <qobject.h>
 #include <qmutex.h>
 #include <iomanip>
-
-struct DirectoryEntry {
-    std::string m_name;
-    std::string m_lastModified;
-    std::string m_owner;
-    std::string m_permissions;
-    uint64_t m_totalBytes;
-    bool m_forbidden = false;
-    bool m_isDirectory = false;
-    bool m_isSymLink = false;
-    bool m_isFile = false;
-};
 
 class DirectoryCache : public QObject {
     Q_OBJECT
@@ -32,6 +21,8 @@ private:
     std::map<std::string, std::vector<DirectoryEntry>> m_cache;
     bool m_initialized;
     QMutex m_mutex;
+
+    time_t parseDateFromLs(const std::string& monthStr, const std::string& dayStr, const std::string& timeOrYearStr);
     
 public:
     DirectoryCache() {}

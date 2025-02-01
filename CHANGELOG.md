@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0 - 2025/02/01
+- Refactored code.
+- Fixed issue with parsing date from remote machine
+- Logger minor bug fixes
+
 ## 0.6.0 - 2024/11/21
 - Implemented disconnect.
 - Switched QPixmap with QIcon.

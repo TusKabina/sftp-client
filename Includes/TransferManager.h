@@ -97,6 +97,7 @@ public:
     [[nodiscard]] const std::string& getUsername() { return m_username; }
     [[nodiscard]] bool isRegularFile(const std::string& filePath) { return m_DirectoryCache.isRegularFile(filePath); }
     [[nodiscard]] const DirectoryCache* getDirectoryCacheObject() const { return &m_DirectoryCache; }
+    
 
     void connect(const std::string& host, const std::string& username, std::string& password);
 
