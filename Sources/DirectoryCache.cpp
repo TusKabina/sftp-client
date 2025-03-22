@@ -25,20 +25,20 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
         {"Sep", 8}, {"Oct", 9}, {"Nov", 10}, {"Dec", 11}
     };
 
-    struct tm tm = { 0 };
+    struct tm tm = {};
     auto monthIt = monthMap.find(monthStr);
     if (monthIt == monthMap.end()) {
         return 0; // Invalid month
     }
-    tm.tm_mon = monthIt->second;
 
+    tm.tm_mon = monthIt->second;
     tm.tm_mday = std::stoi(dayStr);
 
     time_t now = time(nullptr);
     struct tm* now_tm = localtime(&now);
 
     if (timeOrYearStr.find(':') != std::string::npos) {
-        // Time format
+        // If it's time format, assign current year
         int hour = std::stoi(timeOrYearStr.substr(0, 2));
         int minute = std::stoi(timeOrYearStr.substr(3, 2));
         tm.tm_hour = hour;
@@ -46,18 +46,24 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
         tm.tm_sec = 0;
         tm.tm_year = now_tm->tm_year;
 
+        // Normalize
         time_t file_time = mktime(&tm);
 
-        // If the computed file_time is more than 6 months in the future,
-        // it means the file was actually modified in the previous year
-        if (difftime(file_time, now) > (6 * 30 * 24 * 3600)) {
+        // If the parsed date is in the future by more than 6 months, it was likely from last year
+        if (file_time > now && (file_time - now) > (6 * 30 * 24 * 3600)) {
             tm.tm_year -= 1;
             file_time = mktime(&tm);
         }
+        // If the parsed date is too old, correct it
+        else if (file_time < now && (now - file_time) >(6 * 30 * 24 * 3600)) {
+            tm.tm_year += 1;
+            file_time = mktime(&tm);
+        }
+
         return file_time;
     }
     else {
-        // Year format
+        // Year format case
         int year = std::stoi(timeOrYearStr);
         tm.tm_year = year - 1900;
         tm.tm_hour = 0;
@@ -66,6 +72,7 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
         return mktime(&tm);
     }
 }
+
 
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
