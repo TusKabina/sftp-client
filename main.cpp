@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
 
     qRegisterMetaType<TransferStatus>("TransferStatus");
-    qRegisterMetaType<QString>("QString");
+    qRegisterMetaType<std::string>("std::string");
     qRegisterMetaType<LogLevel>("LogLevel");
 
     TreeViewWidget w;
