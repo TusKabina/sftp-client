@@ -4,12 +4,12 @@
 
 class IconManager {
 public:
-    static QIcon getStaticDirectoryIcon() {
+    static QIcon getDirectoryIcon() {
         static QIcon directoryIcon(":/icons/dir.png");
         return directoryIcon;
     }
 
-    static QIcon getStaticFileIcon() {
+    static QIcon getFileIcon() {
         static QIcon fileIcon(":/icons/file.png");
         return fileIcon;
     }
