@@ -8,38 +8,6 @@
 #include "Utilities/Logger.h"
 #include "Qt/IconManager.h"
 
-QIcon& TreeViewWidget::getDirectoryIcon() {
-	static QIcon directoryIcon("dir.png");
-	return directoryIcon;
-}
-
-QIcon& TreeViewWidget::getFileIcon() {
-	static QIcon fileIcon("file.png");
-	return fileIcon;
-}
-
-//std::string GetDirectoryName(const std::string& name) {
-//	size_t pos = name.find_last_of("\\/");
-//	return (std::string::npos == pos) ? "" : name.substr(0, pos);
-//}
-//
-//std::string FileName(const std::string& path) {
-//	return path.substr(path.find_last_of("/\\") + 1);
-//}
-//
-//QString convertSize(qint64 size) {
-//	QStringList units = { "B", "KB", "MB", "GB", "TB" };
-//	int unitIndex = 0;
-//	double sizeInUnits = size;
-//
-//	while (sizeInUnits > 1024.0 && unitIndex < units.size() - 1) {
-//		sizeInUnits /= 1024.0;
-//		unitIndex++;
-//	}
-//
-//	return QString::number(sizeInUnits, 'f', 2) + " " + units[unitIndex];
-//}
-
 QDateTime parseDateString(const std::string& dateString) {
 	QStringList dateParts = QString::fromStdString(dateString).split(' ');
 
@@ -709,11 +677,10 @@ TreeViewWidget::TreeViewWidget() {
 	verticalLayout->addLayout(horizontalLayoutUploadDownloadParameters);
 	verticalLayout->addLayout(horizontalLayoutTreeView);
 	verticalLayout->addLayout(horizontalLogLevelLayout);
-	//verticalLayout->addWidget(&m_textDebugLog);
 
 	verticalLayout->addWidget(&m_textDebugLog);
 
-	// Connect the combobox signal to a slot to handle log filtering
+	// combobox signal
 	connect(m_logLevelComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,  &TreeViewWidget::onLogLevelChanged);
 
 	// Add transfer status widget
@@ -748,7 +715,7 @@ void TreeViewWidget::populateTreeView() {
 }
 
 			QString entryName = QString::fromStdString(entry.m_name);
-			QDateTime dateTime = parseDateString(entry.m_lastModified);
+			QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
 			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 			QString permissions = QString::fromStdString(entry.m_permissions);
 			QString owner = QString::fromStdString(entry.m_owner);
@@ -761,12 +728,12 @@ void TreeViewWidget::populateTreeView() {
 			item->setText(5, owner);
 
 			if (entry.m_isDirectory) {
-				item->setIcon(0, getDirectoryIcon());
+				item->setIcon(0, IconManager::getDirectoryIcon());
 				item->setData(0, Qt::UserRole, true);
 			}
 			else {
 				item->setText(1, Commons::convertSize(entry.m_totalBytes));
-				item->setIcon(0, getFileIcon());
+				item->setIcon(0, IconManager::getFileIcon());
 				item->setData(0, Qt::UserRole, false);
 			}
 
@@ -834,13 +801,15 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 			item->setText(2, typeText);
 		}
 
-		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		//QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
+
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
 		}
 
-		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
+		QIcon desiredIcon = entry.m_isDirectory ? IconManager::getDirectoryIcon() : IconManager::getFileIcon();
 		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
 			item->setIcon(0, desiredIcon);
 		}
@@ -929,7 +898,9 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 			item->setText(2, typeText);
 		}
 
-		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		//QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
+
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
@@ -942,7 +913,7 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 			}
 		}
 
-		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
+		QIcon desiredIcon = entry.m_isDirectory ? IconManager::getDirectoryIcon() : IconManager::getFileIcon();
 		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
 			item->setIcon(0, desiredIcon);
 		}
@@ -1011,13 +982,15 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 			item->setText(2, typeText);
 		}
 
-		QDateTime dateTime = parseDateString(entry.m_lastModified);
+		//QDateTime dateTime = parseDateString(entry.m_lastModified);
+		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
+
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
 		}
 
-		QIcon desiredIcon = entry.m_isDirectory ? getDirectoryIcon() : getFileIcon();
+		QIcon desiredIcon = entry.m_isDirectory ? IconManager::getDirectoryIcon() : IconManager::getFileIcon();
 		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
 			item->setIcon(0, desiredIcon);
 		}
