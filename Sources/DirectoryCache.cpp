@@ -27,6 +27,7 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
 
     struct tm tm = {};
     auto monthIt = monthMap.find(monthStr);
+
     if (monthIt == monthMap.end()) {
         return 0; // Invalid month
     }
@@ -45,7 +46,8 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
         tm.tm_min = minute;
         tm.tm_sec = 0;
         tm.tm_year = now_tm->tm_year;
-
+        tm.tm_isdst = -1;
+        
         // Normalize
         time_t file_time = mktime(&tm);
 
@@ -77,6 +79,7 @@ time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::s
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
     m_curlCode = 0;
+
 	if (m_curlHandle) {
         char* encodedPassword = curl_easy_escape(m_curlHandle.get(), password.c_str(), 0);
         password = std::string(encodedPassword);
@@ -101,6 +104,7 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
     else {
         m_initialized = false;
     }
+
     return m_initialized;
 }
 
@@ -162,6 +166,7 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
     else {
         logger().debug() << "Directory listing of: " << path << " Successful.";
     }
+
     parseResponse(entries, response);
     curl_easy_reset(m_curlHandle.get());
     return entries;
@@ -172,14 +177,16 @@ bool DirectoryCache::isFile(const std::string& path) {
     size_t pos = path.find_last_of("/");
     std::string directoryPath = path.substr(0, pos);
     std::string fileName = path.substr(pos + 1, path.size());
+
     if (isPathInCache(directoryPath)) {
         return false;
     }
+
     const auto& entries = m_cache.at(directoryPath);
     auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
-        return entry.m_name == fileName; });
+        return entry.m_name == fileName; 
+    });
 
-    
     return it != entries.end() && it->m_isFile;
 }
 
@@ -188,20 +195,24 @@ const uint64_t DirectoryCache::getTotalBytes(const std::string& path, const std:
     if (!isPathInCache(path)) {
         return 0;
     }
+
     auto& entries = m_cache.find(path)->second;
     auto it = std::find_if(entries.begin(), entries.end(), [&fileName](const DirectoryEntry& entry) {
         return entry.m_name == fileName;
-        });
+    });
+
     return it != entries.end() ? it->m_totalBytes : 0;
 }
 
 bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries)  {
     QMutexLocker locker(&m_mutex);
     auto it = m_cache.find(path);
+
     if (it != m_cache.end()) {
         entries = it->second;
         return true;
     }
+
     return false;
 }
 
