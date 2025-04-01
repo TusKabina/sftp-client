@@ -146,8 +146,9 @@ void TransferJob::uploadFile(const std::string& url) {
             std::cout << "[UPLOAD] JOBID: " << m_jobId << " starting curl_easy_perform: " << m_transferHandle.m_transferStatus.m_errorMessage << "\n";
             //logger().info() << "Finished uploading source: " << m_transferFile.m_localPath;
             logger().error() << "Error while uploading source: '" << m_transferFile.m_localPath
-                << "' to destination: " << m_transferFile.m_remotePath
-                << "'. Error: " << std::string(curl_easy_strerror(res));
+                             << "' to destination: " << m_transferFile.m_remotePath
+                             << "'. Error: " << std::string(curl_easy_strerror(res));
+
             //onErrorMessage(m_transferHandle.m_transferStatus.m_errorMessage);
            
         }
