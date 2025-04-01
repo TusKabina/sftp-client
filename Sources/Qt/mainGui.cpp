@@ -8,6 +8,8 @@
 #include "Utilities/Logger.h"
 #include "Qt/IconManager.h"
 
+using namespace std::chrono_literals;
+
 QDateTime parseDateString(const std::string& dateString) {
 	QStringList dateParts = QString::fromStdString(dateString).split(' ');
 
@@ -261,12 +263,18 @@ void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path) {
 }
 
 void TreeViewWidget::onRemoteFolderKeyPressed() {
-	std::string path = m_remoteFolderLineEdit->text().toStdString();
-	if (path.back() != '/') {
-		path = path + "/";
+	QString path = m_remoteFolderLineEdit->text();
+
+	if (path.isEmpty()) {
+		logger().error() << "Invalid path!";
 	}
-	logger().info() << "Going to path: " << path;
-	findAndExpandPath(QString::fromStdString(path));
+	else {
+		if (path.back() != '/') {
+			path = path + "/";
+		}
+		logger().info() << "Going to path: " << path;
+		findAndExpandPath(path);
+	}
 
 }
 void TreeViewWidget::onErrorMessageReceived(const std::string errorMessage) {
@@ -455,7 +463,6 @@ void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 		}
 	}
 }
-using namespace std::chrono_literals;
 void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pDownload = menu.addAction(trUtf8("Download"));
@@ -804,6 +811,9 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 		//QDateTime dateTime = parseDateString(entry.m_lastModified);
 		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
 
+		logger().info() << "DateTime" << dateTime.toString();
+		logger().info() << "m_tLastModified" << entry.m_tLastModified;
+
 		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 		if (item->text(3) != formattedDate) {
 			item->setText(3, formattedDate);
@@ -1070,7 +1080,7 @@ QTreeWidgetItem* TreeViewWidget::findOrCreateRoot(const QString& path) {
 }
 
 void TreeViewWidget::findAndExpandPath(const QString& path) {
-	QStringList pathParts = path.split("/", Qt::SkipEmptyParts);
+	QStringList pathParts = path.size() == 1 ? QStringList("/") : path.split("/", Qt::SkipEmptyParts);
 	QTreeWidgetItem* currentItem = nullptr;
 
 	for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
