@@ -65,7 +65,6 @@ public slots:
 	void onDirectoryCacheUpdated(const std::string& path);
 	void onRemoteFolderKeyPressed();
 	void onTransferStatusUpdated(const TransferStatus& transferStatus);
-	void onErrorMessageReceived(const std::string errorMessage);
 	void onCopyAction();
 	void onCutAction();
 	void onPasteAction();
@@ -75,9 +74,12 @@ public:
 	void populateTreeView();
 	void refreshTreeViewRoot(const std::string& path);
 	void updateTreeView(const std::string& path);
-	void insertTreeViewWidget();
 	void findAndExpandPath(const QString& path);
 	void populateTreeWidgetViewDirectory(QTreeWidgetItem* parentItem, const QString& path);
+	void onDownloadAction();
+	void onDeleteRemoteAction();
+	void onuploadAction();
+	void onDeleteLocalAction();
 
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
@@ -132,8 +134,6 @@ private:
 	bool m_isCutOperation;
 	bool m_isConnected = false;
 
-	static QIcon& getDirectoryIcon();
-	static QIcon& getFileIcon();
 };
 
 #endif // SFTP_CLIENT_MAINGUI_H

@@ -54,7 +54,6 @@ void TreeView::dropEvent(QDropEvent* event) {
 		logger().debug() << "Dropped from something else";
 	}
 
-
 	if (!data.isEmpty()) {
 		QString dataAsString = QString(data);
 
@@ -266,9 +265,6 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 	}
 
 }
-void TreeViewWidget::onErrorMessageReceived(const std::string errorMessage) {
-	m_textDebugLog.append(QString::fromStdString(errorMessage));
-}
 
 void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatus) {
 	QTreeWidgetItem* item;
@@ -386,21 +382,26 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 
 	if (prefetch && entryType == "Folder") {
 		logger().debug() << "Expanding Directory: /" << fullPath.toStdString();
+		
 		updateTreeView("/" + fullPath.toStdString() + "/");
+		
 		logger().debug() << "Expanding Directory successful";
 	}
 		
 	std::string newPath = fullPath.toStdString();
 	newPath = "/" + newPath;
+
 	if (m_manager.isRegularFile(newPath)) {
 		m_remoteFileToUploadLineEdit->setText("/"+ fullPath);
 	}
 	else {
 		m_remoteFileToUploadLineEdit->clear();
 	}
+
 	m_textCommandParameterRemote = fullPath;
 	m_directoryNameRemote = "/" + QString::fromStdString(Commons::GetDirectoryName(m_textCommandParameterRemote.toStdString()));
 	m_directoryNameRemote += m_directoryNameRemote == "/" ? "" : "/";
+	
 	m_remoteFolderLineEdit->setText(m_directoryNameRemote);
 }
 
@@ -413,50 +414,13 @@ void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 	QAction* pSelected = menu.exec(m_treeView->mapToGlobal(event->pos()));
 	
 	if (pSelected == pUpload) {
-		std::filesystem::path p = m_textCommandParameterLocal.toStdString();
-
-		if (std::filesystem::is_regular_file(p)) {
-			logger().debug() << "Source: " << p.string() << " is regular file";
-		}
-		else {
-			logger().error() << "Source: " << p.string() << " is not a file!";
-			return;
-		}
-
-		std::string remotePath = "/" + m_textCommandParameterRemote.toStdString();
-		std::string localPath = p.string();
-		std::string localFileName = p.filename();
-
-		if (m_manager.isRegularFile(remotePath)) {
-			std::string remoteDirectoryPath = Commons::GetDirectoryName(remotePath);
-			remotePath = remoteDirectoryPath + "/" + localFileName;
-		}
-		else {
-			remotePath = remotePath + "/" + localFileName;
-		}
-
-		uint64_t uploadJobId = m_manager.prepareJob(localPath, remotePath);
-		m_manager.submitJob(uploadJobId, JobOperation::UPLOAD);
-
-		logger().info() << "Started upload operation. Local path: '" << localPath
-					    << "'. Remote path: " << remotePath;
-
+		onuploadAction();
 	}
 	else if (pSelected == pDelete) {
-		std::filesystem::path p = m_textCommandParameterLocal.toStdString();
-
-		if (std::filesystem::is_regular_file(p)) {
-			std::string localPath = p.string();
-			uint64_t deleteJobId = m_manager.prepareJob(localPath, "");
-			m_manager.submitJob(deleteJobId, JobOperation::DELETE_LOCAL);
-			
-			logger().info() << "started delete operation. Remote path: '" << localPath;
-		}
-		else {
-			logger().error() << "Error. Remote entry: '" << m_textCommandParameterLocal.toStdString() << "' is not file.";
-		}
+		onDeleteLocalAction();
 	}
 }
+
 void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pDownload = menu.addAction(trUtf8("Download"));
@@ -468,68 +432,17 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 		QAction* pPaste = menu.addAction(trUtf8("Paste"));
 		connect(pPaste, &QAction::triggered, this, &TreeViewWidget::onPasteAction);
 	}
+
 	connect(pCopy, &QAction::triggered, this, &TreeViewWidget::onCopyAction);
 	connect(pCut, &QAction::triggered, this, &TreeViewWidget::onCutAction);
 
 	QAction* pSelected = menu.exec(m_treeWidget->mapToGlobal(event->pos()));
 
 	if (pSelected == pDownload) {
-		std::string remotePath = m_textCommandParameterRemote.toStdString();
-
-		if (remotePath.front() != '/') {
-			remotePath = "/" + remotePath;
-		}
-		if (m_manager.isRegularFile(remotePath)) {
-
-
-			std::filesystem::path localPath = m_textCommandParameterLocal.toStdString();
-
-			std::string strLocalPath = localPath.string();
-
-			if (std::filesystem::is_regular_file(localPath)) {
-				strLocalPath = localPath.parent_path().string() + "/" + Commons::FileName(remotePath);
-			}
-			else {
-				strLocalPath = localPath.string() + "/" + Commons::FileName(remotePath);
-			}
-
-			uint64_t downloadJobId = m_manager.prepareJob(strLocalPath, remotePath);
-
-			logger().debug() << "JOB_ID: " << downloadJobId;
-			
-			m_manager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
-
-			logger().info() << "started download operation. Local path: '" << strLocalPath
-							<< "'. Remote Path: '" << remotePath 
-							<< "'";
-		}
-		else {
-			logger().error() << "entry: " << m_textCommandParameterLocal.toStdString() 
-							 << " in a directory: " << m_directoryNameLocal.toStdString() 
-				             << " is not a file.";
-		}
+		onDownloadAction();
 	}
 	else if (pSelected == Pdelete) {
-		std::string strPath = m_textCommandParameterRemote.toStdString();
-
-		if (strPath.front() != '/') {
-			strPath = "/" + strPath;
-
-			if (m_manager.isRegularFile(strPath)) {
-				std::string remotePath = "/" + m_textCommandParameterRemote.toStdString();
-				size_t pos = remotePath.find_last_of("/");
-				uint64_t deleteJobId = m_manager.prepareJob("", remotePath);
-				m_manager.submitJob(deleteJobId, JobOperation::DELETE);
-				
-				logger().info() << "Started delete operation on file: " << m_textCommandParameterRemote.toStdString();
-			}
-		}
-		else {
-			
-			logger().error() << "entry: " << m_textCommandParameterLocal.toStdString()
-							 << " in a directory: " << m_directoryNameLocal.toStdString()
-							 << " is not a file.";
-		}
+		onDeleteRemoteAction();
 	}
 }
 
@@ -661,7 +574,6 @@ TreeViewWidget::TreeViewWidget() {
 	horizontalLayoutUploadDownloadParameters->addWidget(m_remoteFolderLabel);
 	horizontalLayoutUploadDownloadParameters->addWidget(m_remoteFolderLineEdit);
 
-	connect(&m_manager, &TransferManager::errorMessageSent, this, &TreeViewWidget::onErrorMessageReceived);
 	connect(m_remoteFolderLineEdit, &QLineEdit::returnPressed, this, &TreeViewWidget::onRemoteFolderKeyPressed);
 
 	//Add all widgets to layout
@@ -1123,3 +1035,109 @@ void TreeViewWidget::findAndExpandPath(const QString& path) {
 	}
 }
 
+void TreeViewWidget::onDownloadAction() {
+	std::string remotePath = m_textCommandParameterRemote.toStdString();
+
+	if (remotePath.front() != '/') {
+		remotePath = "/" + remotePath;
+	}
+	if (m_manager.isRegularFile(remotePath)) {
+
+
+		std::filesystem::path localPath = m_textCommandParameterLocal.toStdString();
+
+		std::string strLocalPath = localPath.string();
+
+		if (std::filesystem::is_regular_file(localPath)) {
+			strLocalPath = localPath.parent_path().string() + "/" + Commons::FileName(remotePath);
+		}
+		else {
+			strLocalPath = localPath.string() + "/" + Commons::FileName(remotePath);
+		}
+
+		uint64_t downloadJobId = m_manager.prepareJob(strLocalPath, remotePath);
+
+		logger().debug() << "JOB_ID: " << downloadJobId;
+
+		m_manager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
+
+		logger().info() << "started download operation. Local path: '" << strLocalPath
+			<< "'. Remote Path: '" << remotePath
+			<< "'";
+	}
+	else {
+		logger().error() << "entry: " << m_textCommandParameterLocal.toStdString()
+			<< " in a directory: " << m_directoryNameLocal.toStdString()
+			<< " is not a file.";
+	}
+
+}
+
+void TreeViewWidget::onDeleteRemoteAction() {
+	std::string strPath = m_textCommandParameterRemote.toStdString();
+
+	if (strPath.front() != '/') {
+		strPath = "/" + strPath;
+
+		if (m_manager.isRegularFile(strPath)) {
+			std::string remotePath = "/" + m_textCommandParameterRemote.toStdString();
+			size_t pos = remotePath.find_last_of("/");
+			uint64_t deleteJobId = m_manager.prepareJob("", remotePath);
+			m_manager.submitJob(deleteJobId, JobOperation::DELETE);
+
+			logger().info() << "Started delete operation on file: " << m_textCommandParameterRemote.toStdString();
+		}
+	}
+	else {
+
+		logger().error() << "entry: " << m_textCommandParameterLocal.toStdString()
+			<< " in a directory: " << m_directoryNameLocal.toStdString()
+			<< " is not a file.";
+	}
+}
+
+void TreeViewWidget::onuploadAction() {
+	std::filesystem::path p = m_textCommandParameterLocal.toStdString();
+
+	if (std::filesystem::is_regular_file(p)) {
+		logger().debug() << "Source: " << p.string() << " is regular file";
+	}
+	else {
+		logger().error() << "Source: " << p.string() << " is not a file!";
+		return;
+	}
+
+	std::string remotePath = "/" + m_textCommandParameterRemote.toStdString();
+	std::string localPath = p.string();
+	std::string localFileName = p.filename();
+
+	if (m_manager.isRegularFile(remotePath)) {
+		std::string remoteDirectoryPath = Commons::GetDirectoryName(remotePath);
+		remotePath = remoteDirectoryPath + "/" + localFileName;
+	}
+	else {
+		remotePath = remotePath + "/" + localFileName;
+	}
+
+	uint64_t uploadJobId = m_manager.prepareJob(localPath, remotePath);
+	m_manager.submitJob(uploadJobId, JobOperation::UPLOAD);
+
+	logger().info() << "Started upload operation. Local path: '" << localPath
+		<< "'. Remote path: " << remotePath;
+}
+
+void TreeViewWidget::onDeleteLocalAction() {
+	std::filesystem::path p = m_textCommandParameterLocal.toStdString();
+
+	if (std::filesystem::is_regular_file(p)) {
+		std::string localPath = p.string();
+		uint64_t deleteJobId = m_manager.prepareJob(localPath, "");
+
+		m_manager.submitJob(deleteJobId, JobOperation::DELETE_LOCAL);
+
+		logger().info() << "started delete operation. Remote path: '" << localPath;
+	}
+	else {
+		logger().error() << "Error. Remote entry: '" << m_textCommandParameterLocal.toStdString() << "' is not file.";
+	}
+}

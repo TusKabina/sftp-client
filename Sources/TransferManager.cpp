@@ -17,8 +17,6 @@ uint64_t TransferManager::prepareJob(const std::string localPath, const std::str
 
     QObject::connect(job, SIGNAL(onTransferStatusUpdated(TransferStatus)),
         this, SLOT(onTransferStatusReceived(TransferStatus)));
-    QObject::connect(job, SIGNAL(onErrorMessage(std::string)),
-        this, SLOT(onErrorMessageReceived(std::string)));
     return m_transferJobs.back()->getJobId();
 }
 
@@ -38,10 +36,6 @@ void TransferManager::connect(const std::string& host, const std::string& userna
 TransferManager::~TransferManager() {
     m_threadPool.waitForDone();
     curl_global_cleanup();
-}
-
-void TransferManager::onErrorMessageReceived(const std::string errorMessage) {
-    emit errorMessageSent(errorMessage);
 }
 
 void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std::shared_ptr<CURL> curl) {

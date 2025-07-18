@@ -59,7 +59,6 @@ class TransferManager : public QObject {
     Q_OBJECT
 signals:
     void transferStatusUpdated(TransferStatus transferStatus);
-    void errorMessageSent(const std::string errorMessage);
    
 private:
     DirectoryCache m_DirectoryCache;
@@ -107,7 +106,6 @@ public:
 
 public slots:
     void onTransferStatusReceived(TransferStatus status);
-    void onErrorMessageReceived(const std::string errorMessage);
 };
 
 class JobRunnable : public QRunnable {
