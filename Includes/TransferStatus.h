@@ -18,7 +18,7 @@ struct TransferStatus {
     size_t m_bytesTransferred;
     size_t m_totalBytes;
     size_t m_threshold;
-    size_t signal_threshold;
+    size_t m_signalThreshold;
     size_t m_lastBytesTransferred;
     uint64_t m_jobId;
     

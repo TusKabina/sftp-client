@@ -27,7 +27,7 @@ size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void*
         job->m_transferHandle.m_transferStatus.m_bytesTransferred += bytesWritten;
         job->m_transferHandle.m_transferStatus.m_threshold += bytesWritten;
 
-        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.signal_threshold) {
+        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.m_signalThreshold) {
             job->m_transferHandle.m_transferStatus.m_threshold = 0;
             job->m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(job->m_transferHandle.m_transferStatus.m_bytesTransferred) / 
                 job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
@@ -54,7 +54,7 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* 
         job->m_transferHandle.m_transferStatus.m_bytesTransferred += bytesRead;
         job->m_transferHandle.m_transferStatus.m_threshold += bytesRead;
 
-        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.signal_threshold) {
+        if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.m_signalThreshold) {
             job->m_transferHandle.m_transferStatus.m_threshold = 0;
             job->m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(job->m_transferHandle.m_transferStatus.m_bytesTransferred) /
                 job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
@@ -109,7 +109,7 @@ void TransferJob::downloadFile() {
         onTransferStatusUpdated(m_transferHandle.m_transferStatus);
     }
 }
-void TransferJob::uploadFile(const std::string& url) {
+void TransferJob::uploadFile() {
     if (m_transferHandle.m_curlHandle.get()) {
         m_transferFile.m_stream = fopen(m_transferFile.m_localPath.c_str(), "rb");
         if (!m_transferFile.m_stream)
@@ -201,14 +201,14 @@ void TransferJob::copyFile() {
             m_transferHandle.m_transferStatus.m_bytesTransferred = 0;
 
             logger().info() << "Download source: " << m_transferFile.m_remotePath << " is finished. Starting upload ";
-            uploadFile(m_url);
+            uploadFile();
         }
         deleteLocalFile(m_transferFile.m_localPath);
     }
    
 }
 
-void TransferJob::moveFile(const std::string& url) {
+void TransferJob::moveFile() {
     if (m_transferHandle.m_curlHandle.get()) {
         struct curl_slist* header = NULL;
 
@@ -216,7 +216,7 @@ void TransferJob::moveFile(const std::string& url) {
             + std::string("\"") + m_transferFile.m_remotePath + std::string("\"");
         header = curl_slist_append(header, renameCommand.c_str());
 
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, url.c_str());
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, m_url.c_str());
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, dummyWriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_QUOTE, header);
         
@@ -239,7 +239,7 @@ void TransferJob::moveFile(const std::string& url) {
     curl_easy_reset(m_transferHandle.m_curlHandle.get());
 }
 
-void TransferJob::deleteFile(const std::string& url) {
+void TransferJob::deleteFile() {
     if (m_transferHandle.m_curlHandle.get()) {
         struct curl_slist* header = NULL;
         std::string renameCommand = "rm " + std::string("\"") + m_transferFile.m_remotePath + std::string("\"");

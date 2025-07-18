@@ -80,7 +80,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 uint64_t totalBytes = localFile.size();
 
                 (*job)->setFileTotalBytes(totalBytes);
-                (*job)->uploadFile(m_url);
+                (*job)->uploadFile();
 
                 {
                     QMutexLocker locker(&m_mutex);
@@ -103,7 +103,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 }
                 break;
             case JobOperation::MOVE:
-                (*job)->moveFile(m_url);
+                (*job)->moveFile();
                 {
                    QMutexLocker locker(&m_mutex);
                    m_DirectoryCache.refreshDirectory(localDirPath);
@@ -111,7 +111,7 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
                 }
                 break;
             case JobOperation::DELETE:
-                (*job)->deleteFile(m_url);
+                (*job)->deleteFile();
                 {
                     QMutexLocker locker(&m_mutex);
                     m_DirectoryCache.refreshDirectory(remoteDirPath);
@@ -133,7 +133,6 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
 
 void TransferManager::submitJob(uint64_t jobId, JobOperation jobType) {
     auto runnable = new JobRunnable(this, jobId, jobType, &m_threadPool);
-    runnable->setAutoDelete(false);
     m_threadPool.start(runnable);
 }
 

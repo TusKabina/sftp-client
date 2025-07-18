@@ -42,6 +42,18 @@ void TreeView::dragMoveEvent(QDragMoveEvent* event) {
 
 void TreeView::dropEvent(QDropEvent* event) {
 	auto data = event->mimeData()->data("drag/data");
+	QObject* source = event->source();
+	
+	if (auto viewSource = qobject_cast<TreeView*>(source)) {
+		logger().debug() << "Dropped from TreeView";
+	}
+	else if (auto viewSource = qobject_cast<TreeWidget*>(source)) {
+		logger().debug() << "Dropped from TreeWidget";
+	}
+	else {
+		logger().debug() << "Dropped from something else";
+	}
+
 
 	if (!data.isEmpty()) {
 		QString dataAsString = QString(data);
@@ -72,8 +84,6 @@ void TreeView::dropEvent(QDropEvent* event) {
 			
 			uint64_t downloadJobId = transferManager.prepareJob(testLocal, remotePath);
 			transferManager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
-
-
 		}
 	
 	}
@@ -120,8 +130,22 @@ void TreeWidget::dragMoveEvent(QDragMoveEvent* event) {
 }
 
 void TreeWidget::dropEvent(QDropEvent* event) {
-	auto data = event->mimeData()->data("drag/data");
+	QObject* source = event->source();
+	
+	if (auto viewSource = qobject_cast<TreeView*>(source)) {
+		logger().debug() << "Dropped from TreeView";
+	}
+	else if (auto viewSource = qobject_cast<TreeWidget*>(source)) {
+		logger().debug() << "Dropped from TreeWidget";
+		return;
+	}
+	else {
+		logger().debug() << "Dropped from something else?";
+		return;
+	}
 
+	auto data = event->mimeData()->data("drag/data");
+	
 	if (!data.isEmpty()) {
 		QString dataAsString = QString(data);
 

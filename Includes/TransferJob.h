@@ -63,10 +63,10 @@ private:
 
 public:
     void downloadFile();
-    void uploadFile(const std::string& url);
+    void uploadFile();
     void copyFile();
-    void moveFile(const std::string& url);
-    void deleteFile(const std::string& url);
+    void moveFile();
+    void deleteFile();
     void deleteLocalFile(const std::string& path);
     void createDirectory(const std::string& path);
 };

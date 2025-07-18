@@ -44,7 +44,7 @@ TransferStatus::TransferStatus() {
     m_lowSpeedCount = 0;
     m_highSpeedCount = 0;
     m_thresholdCount = 5;
-    signal_threshold = static_cast<size_t>(1024) * 1024 * 2; // after how many MB to trigger signal for updating transfer status
+    m_signalThreshold = static_cast<size_t>(1024) * 1024 * 2; // after how many MB to trigger signal for updating transfer status
     m_threshold = 0;
     m_lastUpdateTime = QDateTime::currentDateTime();
 }
@@ -84,7 +84,7 @@ void TransferStatus::reset() {
     m_bytesTransferred = 0;
     m_totalBytes = 0;
     m_threshold = 0;
-    signal_threshold = 0;
+    m_signalThreshold = 0;
     m_lastBytesTransferred = 0;
     m_jobId = 0;
     m_source = "";
