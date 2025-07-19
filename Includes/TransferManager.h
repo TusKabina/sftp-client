@@ -74,6 +74,15 @@ private:
     CurlThreadPool m_threadPool;
     QMutex m_mutex;
 
+private:
+    void downloadJob(TransferJob* job);
+	void uploadJob(TransferJob* job, const std::string& source);
+    void copyJob(TransferJob* job, const std::string& source);
+    void moveJob(TransferJob* job, const std::string& source, const std::string& destination);
+    void deleteJob(TransferJob* job, const std::string& source);
+    void deleteLocalJob(TransferJob* job);
+	void mkdirJob(TransferJob* job, const std::string& source);
+
 public:
     TransferManager() {}
     TransferManager(QObject* parent)

@@ -41,14 +41,15 @@ TransferManager::~TransferManager() {
 void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std::shared_ptr<CURL> curl) {
    const auto job = std::find_if(m_transferJobs.begin(), m_transferJobs.end(),[&jobId](const TransferJob* transferJob) {
         return transferJob->getJobId() == jobId;
-    });
+   });
    
    if (job == m_transferJobs.end()) {
-       std::cout << "JOB NOT FOUND" << std::endl;
        logger().critical() << "Job with job ID: " << jobId << "Not found!";
        return;
    }
+
     std::string localDirPath = (*job)->getLocalDirectoryPath() + "/";
+    
     (*job)->setTransferHandle(curl);
 
     if(job != m_transferJobs.end()) {
@@ -56,70 +57,25 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
 
         switch (jobType) {
             case JobOperation::DOWNLOAD:
-                {
-                    QMutexLocker locker(&m_mutex);
-                    std::string remotePathDirectory = (*job)->getRemoteDirectoryPath() + "/";
-                    std::string remoteFileName = (*job)->getRemotePath().substr(remotePathDirectory.size(), (*job)->getRemotePath().size());
-                    uint64_t totalBytes = m_DirectoryCache.getTotalBytes(remotePathDirectory, remoteFileName);
-                    (*job)->setFileTotalBytes(totalBytes);  
-                }
-                (*job)->downloadFile();
-               // m_DirectoryCache.refreshDirectory(job->getLocalDirectoryPath() + "/");
+                downloadJob(*job);
                 break;
             case JobOperation::UPLOAD:
-            {
-                QString localPath = QString::fromStdString((*job)->getLocalPath());
-
-                QFileInfo localFile(localPath);
-                uint64_t totalBytes = localFile.size();
-
-                (*job)->setFileTotalBytes(totalBytes);
-                (*job)->uploadFile();
-
-                {
-                    QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory(remoteDirPath);
-                }
+                uploadJob(*job, remoteDirPath);
                 break;
-            }
             case JobOperation::COPY:
-                {
-                    QMutexLocker locker(&m_mutex);
-                    std::string source = (*job)->getLocalDirectoryPath() + "/";
-                    std::string sourceFileName = (*job)->getLocalPath().substr(source.size(), (*job)->getRemotePath().size());
-                    uint64_t totalBytes = m_DirectoryCache.getTotalBytes(source, sourceFileName);
-                    (*job)->setFileTotalBytes(totalBytes);
-                }
-                (*job)->copyFile();
-                {
-                    QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory(remoteDirPath);
-                }
+                copyJob(*job, remoteDirPath);
                 break;
             case JobOperation::MOVE:
-                (*job)->moveFile();
-                {
-                   QMutexLocker locker(&m_mutex);
-                   m_DirectoryCache.refreshDirectory(localDirPath);
-                   m_DirectoryCache.refreshDirectory(remoteDirPath);
-                }
+				moveJob(*job, localDirPath, remoteDirPath);
                 break;
             case JobOperation::DELETE:
-                (*job)->deleteFile();
-                {
-                    QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory(remoteDirPath);
-                }
+				deleteJob(*job, remoteDirPath);
                 break;
             case JobOperation::DELETE_LOCAL:
-                (*job)->deleteLocalFile((*job)->getLocalPath());
+                deleteLocalJob(*job);
                 break;
             case JobOperation::MKDIR:
-                (*job)->createDirectory((*job)->getRemotePath());
-                {
-                    QMutexLocker locker(&m_mutex);
-                    m_DirectoryCache.refreshDirectory(remoteDirPath);
-                }
+				mkdirJob(*job, remoteDirPath);
                 break;
         }
     }
@@ -140,6 +96,84 @@ const TransferJob* TransferManager::getJob(uint64_t jobId) const {
         throw std::runtime_error(err.c_str());
     }
     return *job;
+}
+
+void TransferManager::downloadJob(TransferJob* job) {
+    {
+        QMutexLocker locker(&m_mutex);
+        std::string remotePathDirectory = job->getRemoteDirectoryPath() + "/";
+        std::string remoteFileName = job->getRemotePath().substr(remotePathDirectory.size(), job->getRemotePath().size());
+        uint64_t totalBytes = m_DirectoryCache.getTotalBytes(remotePathDirectory, remoteFileName);
+        job->setFileTotalBytes(totalBytes);
+    }
+    job->downloadFile();
+
+}
+
+void TransferManager::uploadJob(TransferJob* job, const std::string& source) {
+    {
+        QString localPath = QString::fromStdString(job->getLocalPath());
+
+        QFileInfo localFile(localPath);
+        uint64_t totalBytes = localFile.size();
+
+        job->setFileTotalBytes(totalBytes);
+        job->uploadFile();
+
+        {
+            QMutexLocker locker(&m_mutex);
+            m_DirectoryCache.refreshDirectory(source);
+        }
+    }
+}
+
+void TransferManager::copyJob(TransferJob* job, const std::string& source) {
+    {
+        QMutexLocker locker(&m_mutex);
+        std::string remoteSourceFile = job->getLocalDirectoryPath() + "/";
+        std::string remoteSourceFileName = job->getLocalPath().substr(remoteSourceFile.size(), job->getRemotePath().size());
+        uint64_t totalBytes = m_DirectoryCache.getTotalBytes(remoteSourceFile, remoteSourceFileName);
+        job->setFileTotalBytes(totalBytes);
+    }
+    
+    job->copyFile();
+    
+    {
+        QMutexLocker locker(&m_mutex);
+        m_DirectoryCache.refreshDirectory(source);
+    }
+}
+
+void TransferManager::moveJob(TransferJob* job, const std::string& source, const std::string& destination) {
+    job->moveFile();
+    
+    {
+        QMutexLocker locker(&m_mutex);
+        m_DirectoryCache.refreshDirectory(source);
+        m_DirectoryCache.refreshDirectory(destination);
+    }
+}
+
+void TransferManager::deleteJob(TransferJob* job, const std::string& source) {
+    job->deleteFile();
+   
+    {
+        QMutexLocker locker(&m_mutex);
+        m_DirectoryCache.refreshDirectory(source);
+    }
+}
+
+void TransferManager::deleteLocalJob(TransferJob* job) {
+    job->deleteLocalFile(job->getLocalPath());
+}
+
+void TransferManager::mkdirJob(TransferJob* job, const std::string& source) {
+    job->createDirectory(job->getRemotePath());
+    
+    {
+        QMutexLocker locker(&m_mutex);
+        m_DirectoryCache.refreshDirectory(source);
+    }
 }
 
 TransferHandle &TransferManager::findFreeHandle() {

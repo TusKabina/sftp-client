@@ -1,6 +1,5 @@
 #ifndef SFTP_CLIENT_MAINGUI_H
 #define SFTP_CLIENT_MAINGUI_H
-
 #include <QMenu>
 #include <QWidget>
 #include <QTreeView>

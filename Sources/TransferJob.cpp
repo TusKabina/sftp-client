@@ -57,7 +57,8 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* 
         if (job->m_transferHandle.m_transferStatus.m_threshold >= job->m_transferHandle.m_transferStatus.m_signalThreshold) {
             job->m_transferHandle.m_transferStatus.m_threshold = 0;
             job->m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(job->m_transferHandle.m_transferStatus.m_bytesTransferred) /
-                job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+                                                                    job->m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
             job->onTransferStatusUpdated(job->m_transferHandle.m_transferStatus);
         }
         return bytesRead;
@@ -201,6 +202,7 @@ void TransferJob::copyFile() {
             m_transferHandle.m_transferStatus.m_bytesTransferred = 0;
 
             logger().info() << "Download source: " << m_transferFile.m_remotePath << " is finished. Starting upload ";
+           
             uploadFile();
         }
         deleteLocalFile(m_transferFile.m_localPath);
@@ -269,6 +271,7 @@ void TransferJob::deleteFile() {
 void TransferJob::deleteLocalFile(const std::string& path) {
     if (std::remove(path.c_str()) == 0) {
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+       
         logger().info() << "Successfully deleted File. Source: '" << m_transferFile.m_localPath << "'.";
     }
     else {
@@ -314,6 +317,7 @@ uint64_t TransferJob::createJob(const std::string localPath, const std::string r
     m_transferFile.m_remoteDirectoryPath = m_transferFile.m_remotePath.substr(0, m_transferFile.m_remotePath.find_last_of('/'));
     m_url = url;
     m_jobId = UIDGenerator::getInstance().generateID();
+    
     return m_jobId;
 }
 
