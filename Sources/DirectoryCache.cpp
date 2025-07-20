@@ -2,6 +2,7 @@
 #include <iostream> //TODO: DELETE
 #include <sstream>
 #include <algorithm>
+#include <Utilities/Commons.h>
 #include "Utilities/Logger.h"
 
 std::string urlEncode(const std::string& url) {
@@ -190,15 +191,27 @@ bool DirectoryCache::isFile(const std::string& path) {
     return it != entries.end() && it->m_isFile;
 }
 
-const uint64_t DirectoryCache::getTotalBytes(const std::string& path, const std::string& fileName) {
+const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
+
+	// Path: /home/ivanr/Downloads/sftp_interface/file.txt
+    // Directory: /home/ivanr/Downloads/sftp_interface/
+	// File name: file.txt
+
+    const std::string remoteDirectoryPath = path.substr(0, path.find_last_of('/') + 1);
+	const std::string remoteFileName = Commons::FileName(path);
+
+	logger().debug() << "Getting total bytes for file: " << remoteFileName << " in directory: " << remoteDirectoryPath;
+
    // QMutexLocker locker(&m_mutex);
-    if (!isPathInCache(path)) {
+    if (!isPathInCache(remoteDirectoryPath)) {
+		logger().error() << "Directory not found in cache: " << remoteDirectoryPath;
         return 0;
     }
 
-    auto& entries = m_cache.find(path)->second;
-    auto it = std::find_if(entries.begin(), entries.end(), [&fileName](const DirectoryEntry& entry) {
-        return entry.m_name == fileName;
+    auto& entries = m_cache.find(remoteDirectoryPath)->second;
+
+    auto it = std::find_if(entries.begin(), entries.end(), [&remoteFileName](const DirectoryEntry& entry) {
+        return entry.m_name == remoteFileName;
     });
 
     return it != entries.end() ? it->m_totalBytes : 0;
