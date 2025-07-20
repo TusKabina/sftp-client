@@ -67,6 +67,10 @@ public slots:
 	void onCopyAction();
 	void onCutAction();
 	void onPasteAction();
+	void onDownloadAction();
+	void onDeleteRemoteAction();
+	void onuploadAction();
+	void onDeleteLocalAction();
 	void onLogLevelChanged(int index);
 public:
 	TreeViewWidget();
@@ -75,15 +79,14 @@ public:
 	void updateTreeView(const std::string& path);
 	void findAndExpandPath(const QString& path);
 	void populateTreeWidgetViewDirectory(QTreeWidgetItem* parentItem, const QString& path);
-	void onDownloadAction();
-	void onDeleteRemoteAction();
-	void onuploadAction();
-	void onDeleteLocalAction();
+	bool connectToRemote();
+	void disconnectFromRemote();
 
 	QTextEdit& getDebugLog() { return m_textDebugLog; }
 	TransferManager& getTransferManager() { return m_manager; }
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
+	void deleteTreeItems(QTreeWidgetItem* item);
 
 private:
 	TreeView* m_treeView;

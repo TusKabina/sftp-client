@@ -197,7 +197,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 	event->accept();
 }
 
-void deleteTreeItems(QTreeWidgetItem* item) {
+void TreeViewWidget::deleteTreeItems(QTreeWidgetItem* item) {
 	for (int i = 0; i < item->childCount(); ++i) {
 		deleteTreeItems(item->child(i));
 	}
@@ -206,39 +206,29 @@ void deleteTreeItems(QTreeWidgetItem* item) {
 
 void TreeViewWidget::onConnectButtonClicked() {
 	if (m_isConnected) {
-		m_manager.reset();
+		disconnectFromRemote();
 
-		for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
-			QTreeWidgetItem* topLevelItem = m_treeWidget->topLevelItem(i);
-			deleteTreeItems(topLevelItem);
-		}
-
-		m_treeWidget->clear();
-		m_isConnected = false;
-		logger().info() << "Disconnected";
 		m_connectDisconnectButton->setText("Connect");
 		m_remoteFileToUploadLineEdit->clear();
 		m_remoteFolderLineEdit->clear();
-		return;
-	}
-
-	// Connect logic
-	std::string host = m_sftpServerNameLineEdit->text().toStdString();
-	std::string username = m_sftpUserNameLineEdit->text().toStdString();
-	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();
-
-	m_manager.connect(host, username, password);
-	m_isConnected = m_manager.isInitialized();
-
-	if (m_isConnected) {
-		logger().info() << "Connected";
-		m_connectDisconnectButton->setText("Disconnect");
-
-		populateTreeView();
+		
+		logger().info() << "Disconnected";
 	}
 	else {
-		logger().info() << "Disconnected";
-		m_connectDisconnectButton->setText("Connect");
+		m_isConnected =	connectToRemote();
+
+		if (m_isConnected) {
+			populateTreeView();
+			m_connectDisconnectButton->setText("Disconnect");
+			
+			logger().info() << "Connected";
+		}
+		else {
+			m_connectDisconnectButton->setText("Connect");
+			
+			logger().info() << "Disconnected";
+		}
+
 	}
 }
 
@@ -409,16 +399,11 @@ void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
 	QMenu menu;
 	QAction* pUpload = menu.addAction(trUtf8("Upload"));
 	QAction* pDelete = menu.addAction(trUtf8("Delete"));
-	std::string fullPath;
 	
+	connect(pUpload, &QAction::triggered, this, &TreeViewWidget::onuploadAction);
+	connect(pDelete, &QAction::triggered, this, &TreeViewWidget::onDeleteLocalAction);
+
 	QAction* pSelected = menu.exec(m_treeView->mapToGlobal(event->pos()));
-	
-	if (pSelected == pUpload) {
-		onuploadAction();
-	}
-	else if (pSelected == pDelete) {
-		onDeleteLocalAction();
-	}
 }
 
 void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
@@ -435,15 +420,10 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 
 	connect(pCopy, &QAction::triggered, this, &TreeViewWidget::onCopyAction);
 	connect(pCut, &QAction::triggered, this, &TreeViewWidget::onCutAction);
+	connect(pDownload, &QAction::triggered, this, &TreeViewWidget::onDownloadAction);
+	connect(Pdelete, &QAction::triggered, this, &TreeViewWidget::onDeleteRemoteAction);
 
 	QAction* pSelected = menu.exec(m_treeWidget->mapToGlobal(event->pos()));
-
-	if (pSelected == pDownload) {
-		onDownloadAction();
-	}
-	else if (pSelected == Pdelete) {
-		onDeleteRemoteAction();
-	}
 }
 
 TreeViewWidget::TreeViewWidget() {
@@ -1042,10 +1022,7 @@ void TreeViewWidget::onDownloadAction() {
 		remotePath = "/" + remotePath;
 	}
 	if (m_manager.isRegularFile(remotePath)) {
-
-
 		std::filesystem::path localPath = m_textCommandParameterLocal.toStdString();
-
 		std::string strLocalPath = localPath.string();
 
 		if (std::filesystem::is_regular_file(localPath)) {
@@ -1140,4 +1117,28 @@ void TreeViewWidget::onDeleteLocalAction() {
 	else {
 		logger().error() << "Error. Remote entry: '" << m_textCommandParameterLocal.toStdString() << "' is not file.";
 	}
+}
+
+bool TreeViewWidget::connectToRemote() {
+	std::string host = m_sftpServerNameLineEdit->text().toStdString();
+	std::string username = m_sftpUserNameLineEdit->text().toStdString();
+	std::string password = m_sftpPasswordNameLineEdit->text().toStdString();
+
+	m_manager.connect(host, username, password);
+
+	return m_manager.isInitialized();
+	
+}
+
+void TreeViewWidget::disconnectFromRemote() {
+	m_manager.reset();
+
+	for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
+		QTreeWidgetItem* topLevelItem = m_treeWidget->topLevelItem(i);
+		deleteTreeItems(topLevelItem);
+	}
+
+	m_treeWidget->clear();
+	m_isConnected = false;
+	
 }
