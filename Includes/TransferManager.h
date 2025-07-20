@@ -67,9 +67,7 @@ private:
     std::string m_username;
     std::string m_password;
     std::string m_url;
-    uint64_t m_maxHandlesNumber; // TODO: can be deleted?
 
-    std::atomic<uint64_t> m_handleCounter = 0; // TODO: can be deleted?
     bool m_initialized;
     CurlThreadPool m_threadPool;
     QMutex m_mutex;

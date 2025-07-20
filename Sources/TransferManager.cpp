@@ -194,11 +194,8 @@ void TransferManager::reset() {
     m_username = "";
     m_password = "";
     m_url = "";
-    m_maxHandlesNumber = 0;
-    m_handleCounter = 0;
     m_initialized = false;
 
-   // m_threadPool.cleanup();
 }
 
 const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::string &path) {
