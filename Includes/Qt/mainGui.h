@@ -23,6 +23,9 @@
 #include <QMimeData>
 #include <QIcon>
 #include <qcombobox.h>
+#include <QtConcurrent>
+#include <QFuture>
+#include <QFutureWatcher>
 #include "Utilities/Commons.h"
 
 class TreeView : public QTreeView {

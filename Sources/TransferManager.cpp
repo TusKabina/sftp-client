@@ -101,6 +101,7 @@ void TransferManager::downloadJob(TransferJob* job) {
         uint64_t totalBytes = m_DirectoryCache.getTotalBytes(job->getRemotePath());
         job->setFileTotalBytes(totalBytes);
     }
+
     job->downloadFile();
 
 }

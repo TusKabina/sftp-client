@@ -46,12 +46,14 @@ void TreeView::dropEvent(QDropEvent* event) {
 	
 	if (auto viewSource = qobject_cast<TreeView*>(source)) {
 		logger().debug() << "Dropped from TreeView";
+		return;
 	}
 	else if (auto viewSource = qobject_cast<TreeWidget*>(source)) {
 		logger().debug() << "Dropped from TreeWidget";
 	}
 	else {
-		logger().debug() << "Dropped from something else";
+		logger().debug() << "Unkown drop";
+		return;
 	}
 
 	if (!data.isEmpty()) {
@@ -75,16 +77,15 @@ void TreeView::dropEvent(QDropEvent* event) {
 			directoryPath = Commons::GetDirectoryName(p.string());
 			localPath = QString::fromStdString(directoryPath) + "/" + QString::fromStdString(fileName);
 		}
-		std::string testLocal = localPath.toStdString();
+		std::string strLocal = localPath.toStdString();
 
 		TreeViewWidget* parentWidget = qobject_cast<TreeViewWidget*>(parent());
 		if (parentWidget) {
 			TransferManager& transferManager = parentWidget->getTransferManager();
 			
-			uint64_t downloadJobId = transferManager.prepareJob(testLocal, remotePath);
+			uint64_t downloadJobId = transferManager.prepareJob(strLocal, remotePath);
 			transferManager.submitJob(downloadJobId, JobOperation::DOWNLOAD);
 		}
-	
 	}
 
 	event->accept();
@@ -139,7 +140,7 @@ void TreeWidget::dropEvent(QDropEvent* event) {
 		return;
 	}
 	else {
-		logger().debug() << "Dropped from something else?";
+		logger().debug() << "Unkown drop";
 		return;
 	}
 
@@ -215,20 +216,36 @@ void TreeViewWidget::onConnectButtonClicked() {
 		logger().info() << "Disconnected";
 	}
 	else {
-		m_isConnected =	connectToRemote();
+		logger().info() << "Connecting to the remote server...";
+		m_connectDisconnectButton->setEnabled(false);
+		
 
-		if (m_isConnected) {
-			populateTreeView();
-			m_connectDisconnectButton->setText("Disconnect");
-			
-			logger().info() << "Connected";
-		}
-		else {
-			m_connectDisconnectButton->setText("Connect");
-			
-			logger().info() << "Disconnected";
-		}
+		QFuture<void> future = QtConcurrent::run([this](){m_isConnected = connectToRemote();});
 
+		auto* watcher = new QFutureWatcher<void>(this);
+
+		connect(watcher, &QFutureWatcher<void>::finished, this, [this, watcher]() {
+			watcher->deleteLater();
+			if (m_isConnected) {
+
+				populateTreeView();
+
+				m_connectDisconnectButton->setText("Disconnect");
+				m_connectDisconnectButton->setEnabled(true);
+				m_remoteFolderLineEdit->setEnabled(true);
+
+				
+				logger().info() << "Connected";
+			}
+			else {
+				m_connectDisconnectButton->setText("Connect");
+				
+				m_connectDisconnectButton->setEnabled(true);
+				logger().info() << "Disconnected";
+			}
+		});
+
+		watcher->setFuture(future);
 	}
 }
 
@@ -250,8 +267,10 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 		if (path.back() != '/') {
 			path = path + "/";
 		}
-		logger().info() << "Going to path: " << path;
+		
 		findAndExpandPath(path);
+		
+		logger().info() << "Going to path: " << path;
 	}
 
 }
@@ -544,6 +563,7 @@ TreeViewWidget::TreeViewWidget() {
 	m_remoteFolderLabel = new QLabel("Remote directory");
 	m_remoteFolderLineEdit = new QLineEdit;
 	m_remoteFolderLineEdit->setReadOnly(false);
+	m_remoteFolderLineEdit->setEnabled(false);
 
 	horizontalLayoutUploadDownloadParameters->addWidget(m_localFileToUploadLabel);
 	horizontalLayoutUploadDownloadParameters->addWidget(m_localFileToUploadLineEdit);
