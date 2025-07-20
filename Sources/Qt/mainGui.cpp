@@ -234,13 +234,12 @@ void TreeViewWidget::onConnectButtonClicked() {
 				m_connectDisconnectButton->setEnabled(true);
 				m_remoteFolderLineEdit->setEnabled(true);
 
-				
 				logger().info() << "Connected";
 			}
 			else {
 				m_connectDisconnectButton->setText("Connect");
-				
 				m_connectDisconnectButton->setEnabled(true);
+				
 				logger().info() << "Disconnected";
 			}
 		});
