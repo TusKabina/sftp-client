@@ -38,5 +38,12 @@ namespace Commons {
         }
         return rawDate;
     }
+
+   inline std::string ensureSlashAtEnd(std::string s) {
+       if (s.empty() || s.back() != '/') {
+            s.push_back('/');
+        }
+        return s;
+    }
 }
 #endif //SFTP_CLIENT_COMMONS_H
