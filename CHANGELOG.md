@@ -1,6 +1,7 @@
 # Changelog
 
-## 1.0.0 - 2025/02/01
+## UNRELEASED
+- Connecting is now non-blocking
 - Refactored code.
 - Fixed issue with parsing date from remote machine
 - Logger minor bug fixes
