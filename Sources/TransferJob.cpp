@@ -18,6 +18,7 @@ std::string urlEncoder(const std::string& url) {
 }
 
 size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
+	logger().debug() << "Write callback invoked.";
     TransferJob* job = static_cast<TransferJob*>(parent);
     if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
@@ -47,6 +48,11 @@ size_t TransferJob::dummyWriteCallback(void* ptr, size_t size, size_t nmemb, voi
 
 size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
     TransferJob* job = static_cast<TransferJob*>(parent);
+
+    if(job->m_transferHandle.m_cancelled.load(std::memory_order_relaxed)) {
+        return CURL_READFUNC_ABORT;
+	}
+
     if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
         size_t bytesRead = fread(buffer, 1, totalSize, job->m_transferFile.m_stream);
@@ -66,6 +72,12 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* 
     return 0;
 }
 
+int TransferJob::xferinfoCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
+	auto cancelled = static_cast<std::atomic<bool>*>(clientp);
+
+    return cancelled->load(std::memory_order_relaxed) ? 1 : 0;
+}
+
 void TransferJob::downloadFile() {
     if (m_transferHandle.m_curlHandle.get()) {
 
@@ -83,24 +95,52 @@ void TransferJob::downloadFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle.m_cancelled);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFOFUNCTION, TransferJob::xferinfoCallback);
 
         m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
 
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
        
-        if (res != CURLE_OK) {
-            m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
-            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            logger().error() << "Error while downloading Source: '" << m_transferFile.m_remotePath 
-                             << "' to destination: " << m_transferFile.m_localPath 
-                             << "'. Error: " << std::string(curl_easy_strerror(res));
-        }
-        else {
-            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+        if(res == CURLE_ABORTED_BY_CALLBACK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Cancelled;
             
+            logger().info() << "File: " << m_transferFile.m_localPath 
+				<< " was cancelled during download from: " << m_transferFile.m_remotePath;
+
+			logger().info() << "Started cleanup after cancellation.";
+
+            closeStreamFile();
+            curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+            m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+            onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+
+			deleteLocalFile(m_transferFile.m_localPath);
+
+			logger().info() << "Cleanup after cancellation completed.";
+
+            return;
+        }
+		else if (res == CURLE_OK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+
             logger().info() << "Finished downloading Source: " << m_transferFile.m_remotePath;
         }
+        else {
+            m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+            
+            logger().error() << "Error while downloading Source: '" << m_transferFile.m_remotePath
+                << "' to destination: " << m_transferFile.m_localPath
+                << "'. Error: " << std::string(curl_easy_strerror(res));
+          
+        }
+
         closeStreamFile();
         curl_easy_reset(m_transferHandle.m_curlHandle.get());
 
@@ -128,23 +168,46 @@ void TransferJob::uploadFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READFUNCTION, TransferJob::ReadCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READDATA, this);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle.m_cancelled);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFOFUNCTION, TransferJob::xferinfoCallback);
        
         m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
 
-        if (res != CURLE_OK) {
-            
-            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
-            
-            logger().error() << "Error while uploading source: '" << m_transferFile.m_localPath
-                             << "' to destination: " << m_transferFile.m_remotePath
-                             << "'. Error: " << std::string(curl_easy_strerror(res));
+        if (res == CURLE_ABORTED_BY_CALLBACK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Cancelled;
+
+            logger().info() << "File: " << m_transferFile.m_localPath
+                << " was cancelled during upload to: " << m_transferFile.m_remotePath;
+
+			logger().info() << "Started cleanup after cancellation.";
+
+            closeStreamFile();
+            curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+            m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+            onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+
+            deleteFile();
+
+			logger().info() << "Cleanup after cancellation completed.";
+			return;
+        }
+        else if (res == CURLE_OK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+
+            logger().info() << "Finished uploading source: " << m_transferFile.m_localPath;
         }
         else {
-            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
-            
-            logger().info() << "Finished uploading source: " << m_transferFile.m_localPath;
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+
+            logger().error() << "Error while uploading source: '" << m_transferFile.m_localPath
+                << "' to destination: " << m_transferFile.m_remotePath
+                << "'. Error: " << std::string(curl_easy_strerror(res));
 
         }
         //TODO: make custom deleter for CURL shared_ptr where on each decrement curl_easy_reset will be called
@@ -319,6 +382,10 @@ uint64_t TransferJob::createJob(const std::string localPath, const std::string r
     m_jobId = UIDGenerator::getInstance().generateID();
     
     return m_jobId;
+}
+
+void TransferJob::cancelJob() {
+    m_transferHandle.m_cancelled.store(true); 
 }
 
 TransferJob::~TransferJob() {
