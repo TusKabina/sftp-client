@@ -29,6 +29,7 @@ add_executable(SftpClient main.cpp
         Includes/Utilities/MeasureHelper.h
         Includes/Utilities/Logger.h
         Includes/Utilities/Commons.h
+        Includes/LocalOperations.h
         Includes/HandleDeleter.h
         Includes/TransferJob.h
         Includes/TransferManager.h
@@ -46,6 +47,7 @@ add_executable(SftpClient main.cpp
         Sources/TransferManager.cpp
         Sources/DirectoryCache.cpp
         Sources/TransferHandle.cpp 
+        Sources/LocalOperations.cpp
 )
 
 # Link the Qt5 Widgets library

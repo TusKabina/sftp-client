@@ -119,9 +119,6 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     if (entries.empty()) {
             return;
     }
-    {
-       // QMutexLocker locker(&m_mutex);
-    }
     m_cache[path] = entries;
     for (const auto& entry : entries) {
         if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
@@ -192,7 +189,6 @@ bool DirectoryCache::isFile(const std::string& path) {
 }
 
 const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
-
     const std::string remoteDirectoryPath = path.substr(0, path.find_last_of('/') + 1);
 	const std::string remoteFileName = Commons::FileName(path);
 
@@ -277,11 +273,24 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         entry.m_isDirectory = permissions[0] == 'd';
         entry.m_isSymLink = permissions[0] == 'l';
         entry.m_isFile = permissions[0] == '-';
-        entry.m_totalBytes = std::stoul(strSize);
+		entry.m_isHidden = name[0] == '.' || entry.m_isSymLink;
         entry.m_name = name;
         entry.m_owner = owner;
         entry.m_permissions = permissions;
         entry.m_tLastModified = parseDateFromLs(month, day, timeOrYear);
+        entry.m_totalBytes = std::stoul(strSize);
+
+        if(entry.m_isDirectory) {
+            entry.m_type = "Folder";
+        }
+        else if (entry.m_isFile) {
+            auto dot = entry.m_name.rfind('.');
+            entry.m_type = (dot == std::string::npos) ? "" : entry.m_name.substr(dot + 1);
+            entry.m_type += " File";
+        }
+        else {
+            entry.m_type = "Unknown";
+	    }
 
         entries.push_back(entry);
     }

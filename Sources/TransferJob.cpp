@@ -373,6 +373,7 @@ void TransferJob::createDirectory(const std::string& path) {
     curl_easy_reset(m_transferHandle.m_curlHandle.get());
 }
 
+
 uint64_t TransferJob::createJob(const std::string localPath, const std::string remotePath, const std::string url) {
     m_transferFile.m_localPath = localPath;
     m_transferFile.m_localDirectoryPath = m_transferFile.m_localPath.substr(0, m_transferFile.m_localPath.find_last_of('/'));

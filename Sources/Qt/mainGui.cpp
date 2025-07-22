@@ -239,7 +239,7 @@ void TreeViewWidget::processUpdateTreeView(const std::vector<DirectoryEntry>& en
 	QSet<QString> newItems;
 	start = std::chrono::high_resolution_clock::now();
 	for (const auto& entry : entries) {
-		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+		if (entry.m_isHidden) {
 			continue;
 		}
 
@@ -253,7 +253,8 @@ void TreeViewWidget::processUpdateTreeView(const std::vector<DirectoryEntry>& en
 			root->addChild(item);
 		}
 
-		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		
+		QString typeText = QString::fromStdString(entry.m_type);
 		if (item->text(2) != typeText) {
 			item->setText(2, typeText);
 		}
@@ -752,11 +753,12 @@ void TreeViewWidget::populateTreeView() {
 		QTreeWidgetItem* root = findOrCreateRoot(path);
 
 		for (const auto& entry : entries) {
-			if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+			if (entry.m_isHidden) {
 				continue;
 }
 
 			QString entryName = QString::fromStdString(entry.m_name);
+			QString entryType = entry.m_type == "Folder" ? QString::fromStdString(entry.m_type) : QString::fromStdString(entry.m_type);
 			QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
 			QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
 			QString permissions = QString::fromStdString(entry.m_permissions);
@@ -764,7 +766,7 @@ void TreeViewWidget::populateTreeView() {
 
 			QTreeWidgetItem* item = new QTreeWidgetItem(root);
 			item->setText(0, entryName);
-			item->setText(2, entry.m_isDirectory ? "Folder" : "File");
+			item->setText(2, entryType);
 			item->setText(3, formattedDate);
 			item->setText(4, permissions);
 			item->setText(5, owner);
@@ -819,7 +821,7 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 	start = std::chrono::high_resolution_clock::now();
 	QSet<QString> newItems;
 	for (const auto& entry : entries) {
-		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+		if (entry.m_isHidden) {
 			continue;
 		}
 
@@ -838,7 +840,7 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 			}
 		}
 
-		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		QString typeText = QString::fromStdString(entry.m_type);
 		if (item->text(2) != typeText) {
 			item->setText(2, typeText);
 		}
@@ -946,7 +948,7 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 	QSet<QString> newItems;
 
 	for (const auto& entry : entries) {
-		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+		if (entry.m_isHidden) {
 			continue;
 		}
 
@@ -960,7 +962,7 @@ void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, cons
 			root->addChild(item);
 		}
 
-		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		QString typeText = QString::fromStdString(entry.m_type);
 		if (item->text(2) != typeText) {
 			item->setText(2, typeText);
 		}
