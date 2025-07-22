@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <QFileInfo>
 #include <qstring.h>
+#include "Utilities/MeasureHelper.h"
 #include "Utilities/Logger.h"
 
 void TransferManager::setCredentials(const std::string& host, const std::string& username, const std::string& password) {
@@ -83,6 +84,18 @@ void TransferManager::submitJob(uint64_t jobId, JobOperation jobType) {
     m_threadPool.start(runnable);
 }
 
+void TransferManager::cancelJob(uint64_t jobId) {
+    auto job = std::find_if(m_transferJobs.begin(), m_transferJobs.end(),[&jobId](const TransferJob* transferJob) {
+        return transferJob->getJobId() == jobId;
+    });
+    
+    if (job == m_transferJobs.end()) {
+        logger().critical() << "Job with job ID: " << jobId << " Not found!";
+        return;
+    }
+	(*job)->cancelJob();
+}
+
 const TransferJob* TransferManager::getJob(uint64_t jobId) const {
     auto job = std::find_if(m_transferJobs.begin(), m_transferJobs.end(),[&jobId](const TransferJob* transferJob) {
         return transferJob->getJobId() == jobId;
@@ -107,19 +120,17 @@ void TransferManager::downloadJob(TransferJob* job) {
 }
 
 void TransferManager::uploadJob(TransferJob* job, const std::string& source) {
+    QString localPath = QString::fromStdString(job->getLocalPath());
+
+    QFileInfo localFile(localPath);
+    uint64_t totalBytes = localFile.size();
+
+    job->setFileTotalBytes(totalBytes);
+    job->uploadFile();
+
     {
-        QString localPath = QString::fromStdString(job->getLocalPath());
-
-        QFileInfo localFile(localPath);
-        uint64_t totalBytes = localFile.size();
-
-        job->setFileTotalBytes(totalBytes);
-        job->uploadFile();
-
-        {
-            QMutexLocker locker(&m_mutex);
-            m_DirectoryCache.refreshDirectory(source);
-        }
+        QMutexLocker locker(&m_mutex);
+        m_DirectoryCache.refreshDirectory(source);
     }
 }
 
@@ -200,11 +211,16 @@ void TransferManager::reset() {
 }
 
 const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::string &path) {
+	auto start = std::chrono::high_resolution_clock::now();
     std::vector<DirectoryEntry> entries;
     if (!m_DirectoryCache.isPathInCache(path)) {
+		logger().debug() << "Path not in cache, prefetching directories for path: " << path;
         m_DirectoryCache.prefetchDirectories(path, 3);
     }
     m_DirectoryCache.getCachedDirectory(path, entries);
+
+	auto end = std::chrono::high_resolution_clock::now();
+	MeasureHelper::logDuration("getDirectoryList", start, end);
     return entries;
 }
 
@@ -219,6 +235,8 @@ void TransferManager::deleteJob(uint64_t jobId) {
             ++it;
         }
     }
+
+    logger().debug() << "TransferJobs size: " << m_transferJobs.size();
 }
 
 void TransferManager::onTransferStatusReceived(TransferStatus status) {
