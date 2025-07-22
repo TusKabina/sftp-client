@@ -62,6 +62,7 @@ public slots:
 	void onConnectButtonClicked();
 	void onRightClickedAction(QMouseEvent* event);
 	void onRightClickedActionTreeWidget(QMouseEvent* event);
+	void onRightClickedActionTransferStatusWidget(QMouseEvent* event);
 	void processTreeWidgetItemClicked(QTreeWidgetItem* item, int index);
 	void eventFromThreadPoolReceived(int);
 	void onDirectoryCacheUpdated(const std::string& path);
@@ -74,8 +75,19 @@ public slots:
 	void onDeleteRemoteAction();
 	void onuploadAction();
 	void onDeleteLocalAction();
+	void onCancelAction();
+	void onRemoveAction();
 	void onLogLevelChanged(int index);
 public:
+	enum class TransferStatusHeader {
+		FILE_NAME = 0,
+		TRANSFER_STATE,
+		SOURCE,
+		DESTINATION,
+		BYTES_TRANSFERRED,
+		SPEED,
+		PROGRESS
+	};
 	TreeViewWidget();
 	void populateTreeView();
 	void refreshTreeViewRoot(const std::string& path);
@@ -90,10 +102,13 @@ public:
 private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
 	void deleteTreeItems(QTreeWidgetItem* item);
+	void processUpdateTreeView(const std::vector<DirectoryEntry>& entries, const std::string& path);
 
 private:
 	TreeView* m_treeView;
 	TreeWidget* m_treeWidget;
+	bool m_treeWidgetLeftClickForbidden = false;
+	void treeWidgetSetClickedEnabled(bool flag) { m_treeWidgetLeftClickForbidden = flag; };
 
 	QLabel* m_sftpServerNameLabel;
 	QLineEdit* m_sftpServerNameLineEdit;
@@ -129,8 +144,8 @@ private:
 
 	TransferManager m_manager;
 
-	QTreeWidget* m_transferStatusWidget;
-	QMap<int, QTreeWidgetItem*> m_transferItems;
+	TreeWidget* m_transferStatusWidget;
+	QMap<uint64_t, QTreeWidgetItem*> m_transferItems;
 
 	QMutex m_mutex;
 
