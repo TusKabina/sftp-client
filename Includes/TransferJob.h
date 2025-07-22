@@ -11,7 +11,7 @@
 #include <qobject.h>
 #include <cstdio>
 
-class TransferJob : public QObject{
+class TransferJob : public QObject {
     Q_OBJECT
 signals:
     void onTransferStatusUpdated(TransferStatus status);
@@ -52,6 +52,7 @@ public:
     void closeStreamFile();
     void setFileTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
     uint64_t createJob(const std::string localPath, const std::string remotePath, const std::string url);
+    void cancelJob();
 
     ~TransferJob();
 
@@ -59,6 +60,8 @@ private:
     static size_t WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent);
     static size_t dummyWriteCallback(void* ptr, size_t size, size_t nmemb, void* stream);
     static size_t ReadCallback(void *buffer, size_t size, size_t nmemb, void* parent);
+
+    static int xferinfoCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
 
 public:
     void downloadFile();
