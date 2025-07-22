@@ -17,7 +17,7 @@ std::ostream &operator<<(std::ostream& os, TransferStatus::TransferState state) 
         case TransferStatus::TransferState::Failed:
             os << "Failed";
             break;
-        case TransferStatus::TransferState::Canceled:
+        case TransferStatus::TransferState::Cancelled:
             os << "Canceled";
             break;
         case TransferStatus::TransferState::Unknown:
@@ -121,8 +121,8 @@ const std::string TransferStatus::TransferStatetoString() const {
     case TransferStatus::TransferState::Failed:
         strState = "Failed";
         break;
-    case TransferStatus::TransferState::Canceled:
-        strState = "Canceled";
+    case TransferStatus::TransferState::Cancelled:
+        strState = "Cancelled";
         break;
     case TransferStatus::TransferState::Unknown:
         strState = "Unknown";
