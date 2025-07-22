@@ -108,6 +108,7 @@ public:
     void connect(const std::string& host, const std::string& username, std::string& password);
 
     void submitJob(uint64_t jobId, JobOperation jobType);
+    void cancelJob(uint64_t jobId);
 
     ~TransferManager();
 
