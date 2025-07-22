@@ -8,6 +8,7 @@
 #include "Utilities/Logger.h"
 #include "Qt/IconManager.h"
 
+
 using namespace std::chrono_literals;
 
 
@@ -205,6 +206,115 @@ void TreeViewWidget::deleteTreeItems(QTreeWidgetItem* item) {
 	delete item;
 }
 
+void TreeViewWidget::processUpdateTreeView(const std::vector<DirectoryEntry>& entries, const std::string& path) {
+	m_treeWidget->setUpdatesEnabled(false);
+	if (entries.empty()) {
+		//m_treeWidget->setUpdatesEnabled(true);
+		return;
+	}
+	auto startOverall = std::chrono::high_resolution_clock::now();
+
+	auto start = std::chrono::high_resolution_clock::now();
+	
+	QString qPath = QString::fromStdString(path);
+	QTreeWidgetItem* root = findOrCreateRoot(qPath);
+	if (!root) {
+		m_treeWidget->setUpdatesEnabled(true);
+		return;
+	}
+	
+	auto end = std::chrono::high_resolution_clock::now();
+	MeasureHelper::logDuration("Finding or creating root item", start, end);
+
+	start = std::chrono::high_resolution_clock::now();
+
+	QHash<QString, QTreeWidgetItem*> existingItems;
+	for (int i = 0; i < root->childCount(); ++i) {
+		QTreeWidgetItem* child = root->child(i);
+		existingItems.insert(child->text(0), child);
+	}
+
+	end = std::chrono::high_resolution_clock::now();
+	MeasureHelper::logDuration("Collecting existing items", start, end);
+	QSet<QString> newItems;
+	start = std::chrono::high_resolution_clock::now();
+	for (const auto& entry : entries) {
+		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
+			continue;
+		}
+
+		QString entryName = QString::fromStdString(entry.m_name);
+		newItems.insert(entryName);
+
+		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
+		if (!item) {
+			item = new QTreeWidgetItem(root);
+			item->setText(0, entryName);
+			root->addChild(item);
+		}
+
+		QString typeText = entry.m_isDirectory ? "Folder" : "File";
+		if (item->text(2) != typeText) {
+			item->setText(2, typeText);
+		}
+
+		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
+
+		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
+		if (item->text(3) != formattedDate) {
+			item->setText(3, formattedDate);
+		}
+
+		if (!entry.m_isDirectory) {
+			QString sizeText = Commons::convertSize(entry.m_totalBytes);
+			if (item->text(1) != sizeText) {
+				item->setText(1, sizeText);
+			}
+		}
+
+		QIcon desiredIcon = entry.m_isDirectory ? IconManager::getDirectoryIcon() : IconManager::getFileIcon();
+		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
+			item->setIcon(0, desiredIcon);
+		}
+
+		QVariant currentData = item->data(0, Qt::UserRole);
+		bool desiredData = entry.m_isDirectory;
+		if (currentData.toBool() != desiredData) {
+			item->setData(0, Qt::UserRole, desiredData);
+		}
+
+		QString permissions = QString::fromStdString(entry.m_permissions);
+		if (item->text(4) != permissions) {
+			item->setText(4, permissions);
+		}
+
+		QString owner = QString::fromStdString(entry.m_owner);
+		if (item->text(5) != owner) {
+			item->setText(5, owner);
+		}
+	}
+	end = std::chrono::high_resolution_clock::now();
+	MeasureHelper::logDuration("Processing new items", start, end);
+
+	start = std::chrono::high_resolution_clock::now();
+
+	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
+		if (!newItems.contains(it.key())) {
+			delete it.value();
+		}
+	}
+
+	end = std::chrono::high_resolution_clock::now();
+	MeasureHelper::logDuration("Deleting old items", start, end);
+
+	m_treeWidget->setUpdatesEnabled(true);
+
+	auto endOverall = std::chrono::high_resolution_clock::now();
+	
+	logger().debug() << "TreeView updated for path: " << path;
+
+}
+
 void TreeViewWidget::onConnectButtonClicked() {
 	if (m_isConnected) {
 		disconnectFromRemote();
@@ -254,6 +364,8 @@ void TreeViewWidget::eventFromThreadPoolReceived(int id) {
 
 void TreeViewWidget::onDirectoryCacheUpdated(const std::string& path) {
 	refreshTreeViewRoot(path);
+
+	logger().debug() << "Directory cache updated for path: " << path;
 }
 
 void TreeViewWidget::onRemoteFolderKeyPressed() {
@@ -276,6 +388,7 @@ void TreeViewWidget::onRemoteFolderKeyPressed() {
 
 void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatus) {
 	QTreeWidgetItem* item;
+	
 	if (m_transferItems.contains(transferStatus.m_jobId)) {
 		item = m_transferItems[transferStatus.m_jobId];
 	}
@@ -286,29 +399,34 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	}
 
 	std::string fileName = Commons::FileName(transferStatus.m_source);
-	item->setText(0, QString::fromStdString(fileName));
-	item->setText(1, QString::fromStdString(transferStatus.TransferStatetoString()));
-	item->setText(2, QString::fromStdString(transferStatus.m_source));
-	item->setText(3, QString::fromStdString(transferStatus.m_destination));
-	item->setText(4, QString::number(transferStatus.m_bytesTransferred));
+	item->setText(static_cast<int>(TransferStatusHeader::FILE_NAME), QString::fromStdString(fileName));
+	item->setText(static_cast<int>(TransferStatusHeader::TRANSFER_STATE), QString::fromStdString(transferStatus.TransferStatetoString()));
+	item->setText(static_cast<int>(TransferStatusHeader::SOURCE), QString::fromStdString(transferStatus.m_source));
+	item->setText(static_cast<int>(TransferStatusHeader::DESTINATION), QString::fromStdString(transferStatus.m_destination));
+	item->setText(static_cast<int>(TransferStatusHeader::BYTES_TRANSFERRED), QString::number(transferStatus.m_bytesTransferred));
 
-	if (transferStatus.m_progress >= 100) {
-		item->setText(5, "0.000 MB/s");
+	if (transferStatus.m_progress >= 100 || 
+		transferStatus.m_state == TransferStatus::TransferState::Cancelled || 
+		transferStatus.m_state == TransferStatus::TransferState::Failed) {
+
+		item->setText(static_cast<int>(TransferStatusHeader::SPEED), "0.000 MB/s");
 	}
 	else {
-		item->setText(5, QString::number(transferStatus.m_speed) + " MB/s");
+		item->setText(static_cast<int>(TransferStatusHeader::SPEED), QString::number(transferStatus.m_speed) + " MB/s");
 	}
-	item->setText(6, QString::number(transferStatus.m_progress,'f',2) + " %");
+	item->setText(static_cast<int>(TransferStatusHeader::PROGRESS), QString::number(transferStatus.m_progress,'f',2) + " %");
 }
 
 void TreeViewWidget::onCopyAction() {
 	m_sourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = false;
 }
+
 void TreeViewWidget::onCutAction() {
 	m_sourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = true;
 }
+
 void TreeViewWidget::onPasteAction() {
 	QString destinationPath = m_textCommandParameterRemote;
 	if (m_isCutOperation) {
@@ -444,6 +562,18 @@ void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
 	QAction* pSelected = menu.exec(m_treeWidget->mapToGlobal(event->pos()));
 }
 
+void TreeViewWidget::onRightClickedActionTransferStatusWidget(QMouseEvent* event) {
+	QMenu menu;
+	QAction* pCancel = menu.addAction(trUtf8("Cancel"));
+	QAction* pRemove = menu.addAction(trUtf8("Remove"));
+
+	
+	connect(pCancel, &QAction::triggered, this, &TreeViewWidget::onCancelAction);
+	connect(pRemove, &QAction::triggered, this, &TreeViewWidget::onRemoveAction);
+
+	menu.exec(m_transferStatusWidget->mapToGlobal(event->pos()));
+}
+
 TreeViewWidget::TreeViewWidget() {
 	//Local file system setup
 	QFileSystemModel* dirModel = new QFileSystemModel(this);
@@ -490,10 +620,26 @@ TreeViewWidget::TreeViewWidget() {
 	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
 		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
 
+
 	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
 	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
 			this->onDirectoryCacheUpdated(path);
 	});
+
+	// Add transfer status widget
+	m_transferStatusWidget = new TreeWidget(this);
+	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_transferStatusWidget->setColumnCount(7);
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
+		<< "Bytes Transferred" << "Speed" << "Progress");
+	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_transferStatusWidget->setSortingEnabled(true);
+
+	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
+
+	connect(m_transferStatusWidget, SIGNAL(RightClickAction(QMouseEvent*)),
+		this, SLOT(onRightClickedActionTransferStatusWidget(QMouseEvent*)));
+
 
 
 	//Basic layout for widgets
@@ -584,21 +730,12 @@ TreeViewWidget::TreeViewWidget() {
 	verticalLayout->addLayout(horizontalLogLevelLayout);
 
 	verticalLayout->addWidget(&m_textDebugLog);
+	verticalLayout->addWidget(m_transferStatusWidget);
+
 
 	// combobox signal
 	connect(m_logLevelComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,  &TreeViewWidget::onLogLevelChanged);
 
-	// Add transfer status widget
-	m_transferStatusWidget = new QTreeWidget(this);
-	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_transferStatusWidget->setColumnCount(7);
-	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
-														  << "Bytes Transferred" << "Speed" << "Progress");
-	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_transferStatusWidget->setSortingEnabled(true);
-
-	verticalLayout->addWidget(m_transferStatusWidget);
-	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
 	//Set vertical layout as main layout
 	setLayout(verticalLayout);
 
@@ -759,92 +896,35 @@ void TreeViewWidget::refreshTreeViewRoot(const std::string& path) {
 }
 
 void TreeViewWidget::updateTreeView(const std::string& path) {
-	m_treeWidget->setUpdatesEnabled(false);
+	logger().debug() << "Updating TreeView for path: " << path;
+	auto startOverall = std::chrono::high_resolution_clock::now();
 
-	const auto entries = m_manager.getDirectoryList(path);
-	if (entries.empty()) {
-		m_treeWidget->setUpdatesEnabled(true);
-		return;
-	}
 
-	QString qPath = QString::fromStdString(path);
-	QTreeWidgetItem* root = findOrCreateRoot(qPath);
-	if (!root) {
-		m_treeWidget->setUpdatesEnabled(true);
-		return;
-	}
+	auto start = std::chrono::high_resolution_clock::now();
 
-	QHash<QString, QTreeWidgetItem*> existingItems;
-	for (int i = 0; i < root->childCount(); ++i) {
-		QTreeWidgetItem* child = root->child(i);
-		existingItems.insert(child->text(0), child);
-	}
+	//const auto entries = m_manager.getDirectoryList(path);
 
-	QSet<QString> newItems;
+	QFuture<std::vector<DirectoryEntry>> future = QtConcurrent::run([this, path]() {
+		return m_manager.getDirectoryList(path);
+	});
 
-	for (const auto& entry : entries) {
-		if (entry.m_isSymLink || entry.m_name == "." || entry.m_name == "..") {
-			continue;
-		}
+	auto* watcher = new QFutureWatcher<std::vector<DirectoryEntry>>(this);
 
-		QString entryName = QString::fromStdString(entry.m_name);
-		newItems.insert(entryName);
+	connect(watcher, &QFutureWatcher<std::vector<DirectoryEntry>>::finished, this, [this, watcher, path]() {
+		auto entries = watcher->result();
+		watcher->deleteLater();
 
-		QTreeWidgetItem* item = existingItems.value(entryName, nullptr);
-		if (!item) {
-			item = new QTreeWidgetItem(root);
-			item->setText(0, entryName);
-			root->addChild(item);
-		}
+		logger().debug() << "Entries found: " << entries.size();
+		auto start = std::chrono::high_resolution_clock::now();
 
-		QString typeText = entry.m_isDirectory ? "Folder" : "File";
-		if (item->text(2) != typeText) {
-			item->setText(2, typeText);
-		}
+		processUpdateTreeView(entries, path);
+		auto end = std::chrono::high_resolution_clock::now();
 
-		QDateTime dateTime = QDateTime::fromTime_t(entry.m_tLastModified);
+		MeasureHelper::logDuration("processUpdateTreeView", start, end);
 
-		QString formattedDate = dateTime.toString("MM/dd/yyyy HH:mm:ss");
-		if (item->text(3) != formattedDate) {
-			item->setText(3, formattedDate);
-		}
+	});
 
-		if (!entry.m_isDirectory) {
-			QString sizeText = Commons::convertSize(entry.m_totalBytes);
-			if (item->text(1) != sizeText) {
-				item->setText(1, sizeText);
-			}
-		}
-
-		QIcon desiredIcon = entry.m_isDirectory ? IconManager::getDirectoryIcon() : IconManager::getFileIcon();
-		if (item->icon(0).cacheKey() != desiredIcon.cacheKey()) {
-			item->setIcon(0, desiredIcon);
-		}
-
-		QVariant currentData = item->data(0, Qt::UserRole);
-		bool desiredData = entry.m_isDirectory;
-		if (currentData.toBool() != desiredData) {
-			item->setData(0, Qt::UserRole, desiredData);
-		}
-
-		QString permissions = QString::fromStdString(entry.m_permissions);
-		if (item->text(4) != permissions) {
-			item->setText(4, permissions);
-		}
-
-		QString owner = QString::fromStdString(entry.m_owner);
-		if (item->text(5) != owner) {
-			item->setText(5, owner);
-		}
-	}
-
-	for (auto it = existingItems.constBegin(); it != existingItems.constEnd(); ++it) {
-		if (!newItems.contains(it.key())) {
-			delete it.value();
-		}
-	}
-
-	m_treeWidget->setUpdatesEnabled(true);
+	watcher->setFuture(future);
 }
 
 void TreeViewWidget::populateTreeWidgetViewDirectory(QTreeWidgetItem* root, const QString& path) {
@@ -1135,6 +1215,45 @@ void TreeViewWidget::onDeleteLocalAction() {
 	}
 	else {
 		logger().error() << "Error. Remote entry: '" << m_textCommandParameterLocal.toStdString() << "' is not file.";
+	}
+}
+
+void TreeViewWidget::onCancelAction() {
+	logger().debug() << "Cancel action triggered";
+	
+	if (m_transferStatusWidget->currentItem()) {
+		QTreeWidgetItem* currentItem = m_transferStatusWidget->currentItem();
+		uint64_t jobId = m_transferItems.key(currentItem,0);
+		
+		logger().debug() << "Cancelling job with ID: " << jobId;
+
+		m_manager.cancelJob(jobId);
+		m_transferStatusWidget->removeItemWidget(currentItem, 0);
+	
+	}
+	else {
+		logger().warning() << "No transfer item selected for cancellation.";
+	}
+}
+
+void TreeViewWidget::onRemoveAction() {
+	logger().debug() << "Remove action triggered";
+	if (m_transferStatusWidget->currentItem()) {
+		QTreeWidgetItem* currentItem = m_transferStatusWidget->currentItem();
+		std::string transferStatus = currentItem->text(static_cast<int>(TransferStatusHeader::TRANSFER_STATE)).toStdString();
+
+		if (transferStatus == "Completed" || transferStatus == "Cancelled" || transferStatus == "Failed") {
+			logger().info() << "Removing transfer item: " << currentItem->text(0).toStdString();
+			m_transferStatusWidget->removeItemWidget(currentItem, 0);
+			delete currentItem;
+		}
+		else {
+			logger().warning() << "Cannot remove transfer item: " << currentItem->text(static_cast<int>(TransferStatusHeader::FILE_NAME)).toStdString()
+				<< ". Transfer status is still: " << transferStatus << ".";
+		}
+	}
+	else {
+		logger().warning() << "No transfer item selected for removal.";
 	}
 }
 
