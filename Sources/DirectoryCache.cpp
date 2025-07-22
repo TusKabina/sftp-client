@@ -193,10 +193,6 @@ bool DirectoryCache::isFile(const std::string& path) {
 
 const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
 
-	// Path: /home/ivanr/Downloads/sftp_interface/file.txt
-    // Directory: /home/ivanr/Downloads/sftp_interface/
-	// File name: file.txt
-
     const std::string remoteDirectoryPath = path.substr(0, path.find_last_of('/') + 1);
 	const std::string remoteFileName = Commons::FileName(path);
 
