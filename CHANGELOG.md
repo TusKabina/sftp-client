@@ -1,6 +1,9 @@
 # Changelog
 
 ## UNRELEASED
+- Active Download and uploads can now be cancelled.
+- Operations can now be removed from transfer status.
+- Updating tree view is now more efficient.
 - Connecting is now non-blocking
 - Refactored code.
 - Fixed issue with parsing date from remote machine
