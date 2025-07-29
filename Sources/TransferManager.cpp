@@ -55,28 +55,28 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
    std::string remoteDirPath = (*job)->getRemoteDirectoryPath() + "/";
 
    switch (jobType) {
-   case JobOperation::DOWNLOAD:
-       downloadJob(*job);
-       break;
-   case JobOperation::UPLOAD:
-       uploadJob(*job, remoteDirPath);
-       break;
-   case JobOperation::COPY:
-       copyJob(*job, remoteDirPath);
-       break;
-   case JobOperation::MOVE:
-       moveJob(*job, localDirPath, remoteDirPath);
-       break;
-   case JobOperation::DELETE:
-       deleteJob(*job, remoteDirPath);
-       break;
-   case JobOperation::DELETE_LOCAL:
-       deleteLocalJob(*job);
-       break;
-   case JobOperation::MKDIR:
-       mkdirJob(*job, remoteDirPath);
-       break;
-   }
+       case JobOperation::DOWNLOAD:
+           downloadJob(*job);
+           break;
+       case JobOperation::UPLOAD:
+           uploadJob(*job, remoteDirPath);
+           break;
+       case JobOperation::COPY:
+           copyJob(*job, remoteDirPath);
+           break;
+       case JobOperation::MOVE:
+           moveJob(*job, localDirPath, remoteDirPath);
+           break;
+       case JobOperation::DELETE:
+           deleteJob(*job, remoteDirPath);
+           break;
+       case JobOperation::DELETE_LOCAL:
+           deleteLocalJob(*job);
+           break;
+       case JobOperation::MKDIR:
+           mkdirJob(*job, remoteDirPath);
+           break;
+    }
 }
 
 void TransferManager::submitJob(uint64_t jobId, JobOperation jobType) {
