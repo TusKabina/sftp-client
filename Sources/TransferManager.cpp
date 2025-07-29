@@ -211,7 +211,6 @@ void TransferManager::reset() {
 }
 
 const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::string &path) {
-	auto start = std::chrono::high_resolution_clock::now();
     std::vector<DirectoryEntry> entries;
     if (!m_DirectoryCache.isPathInCache(path)) {
 		logger().debug() << "Path not in cache, prefetching directories for path: " << path;
@@ -220,7 +219,6 @@ const std::vector<DirectoryEntry> TransferManager::getDirectoryList(const std::s
     m_DirectoryCache.getCachedDirectory(path, entries);
 
 	auto end = std::chrono::high_resolution_clock::now();
-	MeasureHelper::logDuration("getDirectoryList", start, end);
     return entries;
 }
 
