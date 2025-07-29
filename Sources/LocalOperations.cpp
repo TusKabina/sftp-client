@@ -86,9 +86,9 @@ namespace LocalOperations {
 				std::filesystem::rename(source, destination);
 				return true;
 			}
-			catch (const std::exception&)
+			catch (const std::exception& ex)
 			{
-				logger().error() << "Failed to move file from: " << source << " to: " << destination;
+				logger().error() << "Failed to move file from: " << source << " to: " << destination  << ". Reason: " << ex.what();
 				return false;
 			}
 		}
