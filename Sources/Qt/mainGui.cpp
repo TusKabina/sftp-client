@@ -350,9 +350,24 @@ void TreeViewWidget::constructLocalTreeView() {
 	
 	m_uploadLocalAction = m_LocalContextMenu->addAction(trUtf8("Upload"));
 	m_deleteLocalAction = m_LocalContextMenu->addAction(trUtf8("Delete"));
+	m_renameLocalAction = m_LocalContextMenu->addAction(trUtf8("Rename"));
+	m_copyLocalAction = m_LocalContextMenu->addAction(trUtf8("Copy"));
+	m_cutLocalAction = m_LocalContextMenu->addAction(trUtf8("Cut"));
+	m_pasteLocalAction = m_LocalContextMenu->addAction(trUtf8("Paste"));
 
 	connect(m_uploadLocalAction, &QAction::triggered, this, &TreeViewWidget::onuploadAction);
 	connect(m_deleteLocalAction, &QAction::triggered, this, &TreeViewWidget::onDeleteLocalAction);
+	connect(m_renameLocalAction, &QAction::triggered, this, &TreeViewWidget::onRenameLocalAction);
+	connect(m_copyLocalAction, &QAction::triggered, this, &TreeViewWidget::onCopyLocalAction);
+	connect(m_cutLocalAction, &QAction::triggered, this, &TreeViewWidget::onCutLocalAction);
+	connect(m_pasteLocalAction, &QAction::triggered, this, &TreeViewWidget::onPasteLocalAction);
+	
+
+	m_pasteLocalAction->setEnabled(false);
+
+	// Disabled for now until implemented
+	m_copyLocalAction->setEnabled(false);
+	m_cutLocalAction->setEnabled(false);
 }
 
 void TreeViewWidget::constructRemoteTreeView() {
@@ -528,13 +543,13 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 }
 
 void TreeViewWidget::onCopyAction() {
-	m_sourcePath = m_textCommandParameterRemote;
+	m_remoteSourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = false;
 	m_pasteRemoteAction->setEnabled(true);
 }
 
 void TreeViewWidget::onCutAction() {
-	m_sourcePath = m_textCommandParameterRemote;
+	m_remoteSourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = true;
 	m_pasteRemoteAction->setEnabled(true);
 }
@@ -542,7 +557,7 @@ void TreeViewWidget::onCutAction() {
 void TreeViewWidget::onPasteAction() {
 	QString destinationPath = m_textCommandParameterRemote;
 	if (m_isCutOperation) {
-		std::string sourcePath = "/" + m_sourcePath.toStdString();
+		std::string sourcePath = "/" + m_remoteSourcePath.toStdString();
 		if (!m_manager.isRegularFile(sourcePath)) {
 			logger().error() << "/" << sourcePath << " is not a file!";
 		}
@@ -562,9 +577,9 @@ void TreeViewWidget::onPasteAction() {
 		}
 	}
 	else {
-		std::string sourcePath = "/" + m_sourcePath.toStdString();
+		std::string sourcePath = "/" + m_remoteSourcePath.toStdString();
 		if (!m_manager.isRegularFile(sourcePath)) {
-			logger().error() << "/" << sourcePath << " is not a file!";
+			logger().error() << sourcePath << " is not a file!";
 		}
 		else {
 			std::string destPath = "/" + destinationPath.toStdString();
@@ -580,7 +595,7 @@ void TreeViewWidget::onPasteAction() {
 
 		}
 	}
-	m_sourcePath.clear();
+	m_remoteSourcePath.clear();
 	m_isCutOperation = false;
 	m_pasteRemoteAction->setEnabled(false);
 }
@@ -657,7 +672,6 @@ void TreeViewWidget::onRightClickedActionTransferStatusWidget(QMouseEvent* event
 }
 
 TreeViewWidget::TreeViewWidget() {
-	
 	constructLocalTreeView();
 	constructRemoteTreeView();
 	constructTransferStatusWidget();
@@ -1272,7 +1286,65 @@ void TreeViewWidget::onRemoveAction() {
 }
 
 void TreeViewWidget::onRenameLocalAction() {
+	QModelIndex idx = m_treeView->currentIndex();
+	if (idx.isValid()) {
+		m_treeView->edit(idx);
+	}
+}
 
+void TreeViewWidget::onCopyLocalAction() {
+	m_remoteSourcePath = m_textCommandParameterLocal;
+	m_isCutOperation = false;
+	m_pasteLocalAction->setEnabled(true);
+}
+
+void TreeViewWidget::onCutLocalAction() {
+}
+
+void TreeViewWidget::onPasteLocalAction() {
+	QString destinationPath = m_textCommandParameterRemote;
+	if (m_isCutOperation) {
+		std::string sourcePath = "/" + m_remoteSourcePath.toStdString();
+		if (!m_manager.isRegularFile(sourcePath)) {
+			logger().error() << "/" << sourcePath << " is not a file!";
+		}
+		else {
+			std::string destPath = "/" + destinationPath.toStdString();
+			if (!m_manager.isRegularFile(destPath)) {
+				destPath = destPath + '/' + Commons::FileName(sourcePath);
+			}
+			else {
+				destPath = Commons::GetDirectoryName(destPath) + "/" + Commons::FileName(sourcePath);
+			}
+			logger().info() << "Started move operation. Source: '" << sourcePath << "' Destination: '" << destPath << "'";
+
+			uint64_t moveJobId = m_manager.prepareJob(sourcePath, destPath);
+			logger().debug() << "Prepared Job with job id: " << moveJobId;
+			m_manager.submitJob(moveJobId, JobOperation::MOVE);
+		}
+	}
+	else {
+		std::string sourcePath = "/" + m_remoteSourcePath.toStdString();
+		if (!m_manager.isRegularFile(sourcePath)) {
+			logger().error() << sourcePath << " is not a file!";
+		}
+		else {
+			std::string destPath = "/" + destinationPath.toStdString();
+			if (!m_manager.isRegularFile(destPath)) {
+				destPath = destPath + '/' + Commons::FileName(sourcePath);
+			}
+			else {
+				destPath = Commons::GetDirectoryName(destPath) + "/" + Commons::FileName(sourcePath);
+			}
+			logger().info() << "Started copy operation. Source: '" << sourcePath << "' Destination: '" << destPath << "'";
+			uint64_t copyJobId = m_manager.prepareJob(sourcePath, destPath);
+			m_manager.submitJob(copyJobId, JobOperation::COPY);
+
+		}
+	}
+	m_remoteSourcePath.clear();
+	m_isCutOperation = false;
+	m_pasteRemoteAction->setEnabled(false);
 }
 
 bool TreeViewWidget::connectToRemote() {

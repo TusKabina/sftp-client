@@ -78,6 +78,9 @@ public slots:
 	void onCancelAction();
 	void onRemoveAction();
 	void onRenameLocalAction();
+	void onCopyLocalAction();
+	void onCutLocalAction();
+	void onPasteLocalAction();
 	void onLogLevelChanged(int index);
 public:
 	enum class TransferStatusHeader {
@@ -155,9 +158,11 @@ private:
 
 	QMutex m_mutex;
 
-	QString m_sourcePath;
+	QString m_remoteSourcePath;
+	QString m_localSourcePath;
 	QList<QString> m_expandedPaths;
 	bool m_isCutOperation;
+	bool m_isCutLocalOperation;
 	bool m_isConnected = false;
 
 	QMenu* m_LocalContextMenu;
@@ -173,6 +178,10 @@ private:
 	QAction* m_uploadRemoteAction;
 	QAction* m_deleteLocalAction;
 	QAction* m_uploadLocalAction;
+	QAction* m_cutLocalAction;
+	QAction* m_copyLocalAction;
+	QAction* m_pasteLocalAction;
+	QAction* m_renameLocalAction;
 	QAction* m_cancelAction;
 	QAction* m_removeAction;
 
