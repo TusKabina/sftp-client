@@ -3,6 +3,7 @@
 #include <thread>
 #include <cstdio>
 #include "Utilities/Logger.h"
+#include "LocalOperations.h"
 
 std::string urlEncoder(const std::string& url) {
     std::ostringstream encoded;
@@ -18,7 +19,6 @@ std::string urlEncoder(const std::string& url) {
 }
 
 size_t TransferJob::WriteCallback(void* buffer, size_t size, size_t nmemb, void* parent) {
-	logger().debug() << "Write callback invoked.";
     TransferJob* job = static_cast<TransferJob*>(parent);
     if (job->m_transferFile.m_stream) {
         size_t totalSize = size * nmemb;
@@ -332,16 +332,18 @@ void TransferJob::deleteFile() {
 }
 
 void TransferJob::deleteLocalFile(const std::string& path) {
-    if (std::remove(path.c_str()) == 0) {
+
+    if(LocalOperations::deleteFile(path)) {
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
        
         logger().info() << "Successfully deleted File. Source: '" << m_transferFile.m_localPath << "'.";
-    }
+        return;
+	}
     else {
         m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
        
         logger().error() << "Failed to delete a file. Source: '" << m_transferFile.m_localPath << "'. Permission denied";
-    }
+	}
 }
 
 void TransferJob::createDirectory(const std::string& path) {
