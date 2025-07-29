@@ -77,6 +77,7 @@ public slots:
 	void onDeleteLocalAction();
 	void onCancelAction();
 	void onRemoveAction();
+	void onRenameLocalAction();
 	void onLogLevelChanged(int index);
 public:
 	enum class TransferStatusHeader {
@@ -103,12 +104,17 @@ private:
 	QTreeWidgetItem* findOrCreateRoot(const QString& path);
 	void deleteTreeItems(QTreeWidgetItem* item);
 	void processUpdateTreeView(const std::vector<DirectoryEntry>& entries, const std::string& path);
+	void treeWidgetSetClickedEnabled(bool flag) { m_treeWidgetLeftClickForbidden = flag; };
+
+	void constructLocalTreeView();
+	void constructRemoteTreeView();
+	void constructTransferStatusWidget();
+
 
 private:
 	TreeView* m_treeView;
 	TreeWidget* m_treeWidget;
 	bool m_treeWidgetLeftClickForbidden = false;
-	void treeWidgetSetClickedEnabled(bool flag) { m_treeWidgetLeftClickForbidden = flag; };
 
 	QLabel* m_sftpServerNameLabel;
 	QLineEdit* m_sftpServerNameLineEdit;
@@ -153,6 +159,22 @@ private:
 	QList<QString> m_expandedPaths;
 	bool m_isCutOperation;
 	bool m_isConnected = false;
+
+	QMenu* m_LocalContextMenu;
+	QMenu* m_RemoteContextMenu;
+	QMenu* m_transferStatusContextMenu;
+
+	// QActions for context menus
+	QAction* m_downloadRemoteAction;
+	QAction* m_copyRemoteAction;
+	QAction* m_cutRemoteAction;
+	QAction* m_pasteRemoteAction;
+	QAction* m_deleteRemoteAction;
+	QAction* m_uploadRemoteAction;
+	QAction* m_deleteLocalAction;
+	QAction* m_uploadLocalAction;
+	QAction* m_cancelAction;
+	QAction* m_removeAction;
 
 };
 

@@ -316,6 +316,115 @@ void TreeViewWidget::processUpdateTreeView(const std::vector<DirectoryEntry>& en
 
 }
 
+void TreeViewWidget::constructLocalTreeView() {
+	//Local file system setup
+	QFileSystemModel* dirModel = new QFileSystemModel(this);
+	dirModel->setReadOnly(false);
+	dirModel->setRootPath("/");
+	dirModel->setFilter(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files);
+
+	//Set read only on text
+	m_textDebugLog.setReadOnly(true);
+
+	//Tree view for local machine files
+	m_treeView = new TreeView(this);
+	m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_treeView->setDragEnabled(true);
+	m_treeView->viewport()->setAcceptDrops(true);
+	m_treeView->setDropIndicatorShown(true);
+	m_treeView->setDragDropMode(QAbstractItemView::DragDrop);
+	connect(m_treeView, SIGNAL(clicked(const QModelIndex&)),
+		this, SLOT(onClickedTreeView(const QModelIndex&)));
+	connect(m_treeView, SIGNAL(RightClickAction(QMouseEvent*)),
+		this, SLOT(onRightClickedAction(QMouseEvent*)));
+	m_treeView->setModel(dirModel);
+	QModelIndex idx = dirModel->index("/");
+	m_treeView->setRootIndex(idx);
+	m_treeView->setSortingEnabled(true);
+	m_treeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_treeView->header()->setSortIndicatorShown(true);
+	m_treeView->selectionModel();
+
+	// Local context menu setup
+	m_LocalContextMenu = new QMenu(this);
+	
+	m_uploadLocalAction = m_LocalContextMenu->addAction(trUtf8("Upload"));
+	m_deleteLocalAction = m_LocalContextMenu->addAction(trUtf8("Delete"));
+
+	connect(m_uploadLocalAction, &QAction::triggered, this, &TreeViewWidget::onuploadAction);
+	connect(m_deleteLocalAction, &QAction::triggered, this, &TreeViewWidget::onDeleteLocalAction);
+}
+
+void TreeViewWidget::constructRemoteTreeView() {
+	//Tree widget for remote machine files
+	m_treeWidget = new TreeWidget(this);
+	m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_treeWidget->setDragEnabled(true);
+	m_treeWidget->viewport()->setAcceptDrops(true);
+	m_treeWidget->setDropIndicatorShown(true);
+	m_treeWidget->setDragDropMode(QAbstractItemView::DragDrop);
+	connect(m_treeWidget, SIGNAL(RightClickAction(QMouseEvent*)),
+		this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
+
+	m_treeWidget->setEnabled(true);
+	m_treeWidget->setColumnCount(4);
+	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified", "Permissions", "Owner" });
+	m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_treeWidget->setSortingEnabled(true);
+
+	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
+		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
+
+	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
+	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
+		this->onDirectoryCacheUpdated(path);
+	});
+
+	//Remote context menu setup
+	m_RemoteContextMenu = new QMenu(this);
+	m_downloadRemoteAction = m_RemoteContextMenu->addAction(trUtf8("Download"));
+	m_deleteRemoteAction = m_RemoteContextMenu->addAction(trUtf8("Delete"));
+	m_copyRemoteAction = m_RemoteContextMenu->addAction(trUtf8("Copy"));
+	m_cutRemoteAction = m_RemoteContextMenu->addAction(trUtf8("Cut"));
+	
+	m_pasteRemoteAction = m_RemoteContextMenu->addAction(trUtf8("Paste"));
+
+	connect(m_copyRemoteAction, &QAction::triggered, this, &TreeViewWidget::onCopyAction);
+	connect(m_cutRemoteAction, &QAction::triggered, this, &TreeViewWidget::onCutAction);
+	connect(m_downloadRemoteAction, &QAction::triggered, this, &TreeViewWidget::onDownloadAction);
+	connect(m_deleteRemoteAction, &QAction::triggered, this, &TreeViewWidget::onDeleteRemoteAction);
+	connect(m_pasteRemoteAction, &QAction::triggered, this, &TreeViewWidget::onPasteAction);
+
+	m_pasteRemoteAction->setEnabled(false);
+
+}
+
+void TreeViewWidget::constructTransferStatusWidget() {
+	// Add transfer status widget
+	m_transferStatusWidget = new TreeWidget(this);
+	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_transferStatusWidget->setColumnCount(7);
+	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
+		<< "Bytes Transferred" << "Speed" << "Progress");
+	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	m_transferStatusWidget->setSortingEnabled(true);
+
+	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
+
+	connect(m_transferStatusWidget, SIGNAL(RightClickAction(QMouseEvent*)),
+		this, SLOT(onRightClickedActionTransferStatusWidget(QMouseEvent*)));
+	
+	m_transferStatusContextMenu = new QMenu(this);
+
+	m_cancelAction = m_transferStatusContextMenu->addAction(trUtf8("Cancel"));
+	m_removeAction = m_transferStatusContextMenu->addAction(trUtf8("Remove"));
+
+
+	connect(m_cancelAction, &QAction::triggered, this, &TreeViewWidget::onCancelAction);
+	connect(m_removeAction, &QAction::triggered, this, &TreeViewWidget::onRemoveAction);
+
+}
+
 void TreeViewWidget::onConnectButtonClicked() {
 	if (m_isConnected) {
 		disconnectFromRemote();
@@ -421,11 +530,13 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 void TreeViewWidget::onCopyAction() {
 	m_sourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = false;
+	m_pasteRemoteAction->setEnabled(true);
 }
 
 void TreeViewWidget::onCutAction() {
 	m_sourcePath = m_textCommandParameterRemote;
 	m_isCutOperation = true;
+	m_pasteRemoteAction->setEnabled(true);
 }
 
 void TreeViewWidget::onPasteAction() {
@@ -471,6 +582,7 @@ void TreeViewWidget::onPasteAction() {
 	}
 	m_sourcePath.clear();
 	m_isCutOperation = false;
+	m_pasteRemoteAction->setEnabled(false);
 }
 
 void TreeViewWidget::onLogLevelChanged(int index) {
@@ -533,114 +645,22 @@ void TreeViewWidget::processTreeWidgetItemClicked(QTreeWidgetItem* item, int ind
 }
 
 void TreeViewWidget::onRightClickedAction(QMouseEvent* event) {
-	QMenu menu;
-	QAction* pUpload = menu.addAction(trUtf8("Upload"));
-	QAction* pDelete = menu.addAction(trUtf8("Delete"));
-	
-	connect(pUpload, &QAction::triggered, this, &TreeViewWidget::onuploadAction);
-	connect(pDelete, &QAction::triggered, this, &TreeViewWidget::onDeleteLocalAction);
-
-	QAction* pSelected = menu.exec(m_treeView->mapToGlobal(event->pos()));
+	m_LocalContextMenu->exec(m_treeView->viewport()->mapToGlobal(event->pos()));
 }
 
 void TreeViewWidget::onRightClickedActionTreeWidget(QMouseEvent* event) {
-	QMenu menu;
-	QAction* pDownload = menu.addAction(trUtf8("Download"));
-	QAction* Pdelete = menu.addAction(trUtf8("Delete"));
-	QAction* pCopy = menu.addAction(trUtf8("Copy"));
-	QAction* pCut = menu.addAction(trUtf8("Cut"));
-
-	if (!m_sourcePath.isEmpty()) {
-		QAction* pPaste = menu.addAction(trUtf8("Paste"));
-		connect(pPaste, &QAction::triggered, this, &TreeViewWidget::onPasteAction);
-	}
-
-	connect(pCopy, &QAction::triggered, this, &TreeViewWidget::onCopyAction);
-	connect(pCut, &QAction::triggered, this, &TreeViewWidget::onCutAction);
-	connect(pDownload, &QAction::triggered, this, &TreeViewWidget::onDownloadAction);
-	connect(Pdelete, &QAction::triggered, this, &TreeViewWidget::onDeleteRemoteAction);
-
-	QAction* pSelected = menu.exec(m_treeWidget->mapToGlobal(event->pos()));
+	m_RemoteContextMenu->exec(m_treeWidget->viewport()->mapToGlobal(event->pos()));
 }
 
 void TreeViewWidget::onRightClickedActionTransferStatusWidget(QMouseEvent* event) {
-	QMenu menu;
-	QAction* pCancel = menu.addAction(trUtf8("Cancel"));
-	QAction* pRemove = menu.addAction(trUtf8("Remove"));
-
-	
-	connect(pCancel, &QAction::triggered, this, &TreeViewWidget::onCancelAction);
-	connect(pRemove, &QAction::triggered, this, &TreeViewWidget::onRemoveAction);
-
-	menu.exec(m_transferStatusWidget->mapToGlobal(event->pos()));
+	m_transferStatusContextMenu->exec(m_transferStatusWidget->viewport()->mapToGlobal(event->pos()));
 }
 
 TreeViewWidget::TreeViewWidget() {
-	//Local file system setup
-	QFileSystemModel* dirModel = new QFileSystemModel(this);
-	dirModel->setRootPath("/");
-	dirModel->setFilter(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files);
-
-	//Set read only on text (no changes possibile by hand)
-	m_textDebugLog.setReadOnly(true);
-
-	//Tree view for local machine files
-	m_treeView = new TreeView(this);
-	m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_treeView->setDragEnabled(true);
-	m_treeView->viewport()->setAcceptDrops(true);
-	m_treeView->setDropIndicatorShown(true);
-	m_treeView->setDragDropMode(QAbstractItemView::DragDrop);
-	connect(m_treeView, SIGNAL(clicked(const QModelIndex&)),
-		this, SLOT(onClickedTreeView(const QModelIndex&)));
-	connect(m_treeView, SIGNAL(RightClickAction(QMouseEvent*)),
-		this, SLOT(onRightClickedAction(QMouseEvent*)));
-	m_treeView->setModel(dirModel);
-	QModelIndex idx = dirModel->index("/");
-	m_treeView->setRootIndex(idx);
-	m_treeView->setSortingEnabled(true);
-	m_treeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_treeView->header()->setSortIndicatorShown(true);
-	m_treeView->selectionModel();
-
-	//Tree widget for remote machine files
-	m_treeWidget = new TreeWidget(this);
-	m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_treeWidget->setDragEnabled(true);
-	m_treeWidget->viewport()->setAcceptDrops(true);
-	m_treeWidget->setDropIndicatorShown(true);
-	m_treeWidget->setDragDropMode(QAbstractItemView::DragDrop);
-	connect(m_treeWidget, SIGNAL(RightClickAction(QMouseEvent*)),
-		this, SLOT(onRightClickedActionTreeWidget(QMouseEvent*)));
-	m_treeWidget->setEnabled(true);
-	m_treeWidget->setColumnCount(4);
-	m_treeWidget->setHeaderLabels({ "Name", "Size", "Type", "Date Modified", "Permissions", "Owner"});
-	m_treeWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_treeWidget->setSortingEnabled(true);
-
-	connect(m_treeWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)),
-		this, SLOT(processTreeWidgetItemClicked(QTreeWidgetItem*, int)));
-
-
-	const DirectoryCache* cacheManager = m_manager.getDirectoryCacheObject();
-	connect(const_cast<DirectoryCache*>(cacheManager), &DirectoryCache::onDirectoryUpdated, this, [this](const std::string path) {
-			this->onDirectoryCacheUpdated(path);
-	});
-
-	// Add transfer status widget
-	m_transferStatusWidget = new TreeWidget(this);
-	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_transferStatusWidget->setColumnCount(7);
-	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
-		<< "Bytes Transferred" << "Speed" << "Progress");
-	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_transferStatusWidget->setSortingEnabled(true);
-
-	connect(&m_manager, &TransferManager::transferStatusUpdated, this, &TreeViewWidget::onTransferStatusUpdated);
-
-	connect(m_transferStatusWidget, SIGNAL(RightClickAction(QMouseEvent*)),
-		this, SLOT(onRightClickedActionTransferStatusWidget(QMouseEvent*)));
-
+	
+	constructLocalTreeView();
+	constructRemoteTreeView();
+	constructTransferStatusWidget();
 
 
 	//Basic layout for widgets
@@ -904,7 +924,6 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-	//const auto entries = m_manager.getDirectoryList(path);
 
 	QFuture<std::vector<DirectoryEntry>> future = QtConcurrent::run([this, path]() {
 		return m_manager.getDirectoryList(path);
@@ -916,14 +935,7 @@ void TreeViewWidget::updateTreeView(const std::string& path) {
 		auto entries = watcher->result();
 		watcher->deleteLater();
 
-		logger().debug() << "Entries found: " << entries.size();
-		auto start = std::chrono::high_resolution_clock::now();
-
 		processUpdateTreeView(entries, path);
-		auto end = std::chrono::high_resolution_clock::now();
-
-		MeasureHelper::logDuration("processUpdateTreeView", start, end);
-
 	});
 
 	watcher->setFuture(future);
@@ -1257,6 +1269,10 @@ void TreeViewWidget::onRemoveAction() {
 	else {
 		logger().warning() << "No transfer item selected for removal.";
 	}
+}
+
+void TreeViewWidget::onRenameLocalAction() {
+
 }
 
 bool TreeViewWidget::connectToRemote() {
