@@ -9,9 +9,9 @@ namespace LocalOperations {
 				std::filesystem::remove(path);
 				return true;
 			}
-			catch (const std::exception&)
+			catch (const std::exception& ex)
 			{
-				logger().error() << "Failed to delete file: " << path;
+				logger().error() << "Failed to delete file: " << path << ". Reason: "  << ex.what();
 				return false;
 			}
 		}
