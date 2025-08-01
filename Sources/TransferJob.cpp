@@ -50,6 +50,7 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* 
     TransferJob* job = static_cast<TransferJob*>(parent);
 
     if(job->m_transferHandle.m_cancelled.load(std::memory_order_relaxed)) {
+		logger().error() << "Transfer job has been cancelled INSIDE READ CALLBACK!";
         return CURL_READFUNC_ABORT;
 	}
 
@@ -73,9 +74,19 @@ size_t TransferJob::ReadCallback(void* buffer, size_t size, size_t nmemb, void* 
 }
 
 int TransferJob::xferinfoCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
-	auto cancelled = static_cast<std::atomic<bool>*>(clientp);
+	TransferHandle* transferHandle = static_cast<TransferHandle*>(clientp);
 
-    return cancelled->load(std::memory_order_relaxed) ? 1 : 0;
+    if(transferHandle->m_cancelled.load(std::memory_order_relaxed)) {
+        logger().error() << "Cancel has been initiated!";
+        return 1;
+	}
+    else if (transferHandle->m_paused.load(std::memory_order_relaxed)) {
+        logger().error() << "Pause has been initiated!";
+        return 1;
+    }
+    else {
+        return 0;
+    }
 }
 
 void TransferJob::downloadFile() {
@@ -95,7 +106,7 @@ void TransferJob::downloadFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle.m_cancelled);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_NOPROGRESS, 0L);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFOFUNCTION, TransferJob::xferinfoCallback);
 
@@ -105,24 +116,45 @@ void TransferJob::downloadFile() {
         CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
        
         if(res == CURLE_ABORTED_BY_CALLBACK) {
-            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Cancelled;
+            if (m_transferHandle.m_cancelled.load(std::memory_order_relaxed)) {
+                m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Cancelled;
             
-            logger().info() << "File: " << m_transferFile.m_localPath 
-				<< " was cancelled during download from: " << m_transferFile.m_remotePath;
+                logger().info() << "File: " << m_transferFile.m_localPath 
+				    << " was cancelled during download from: " << m_transferFile.m_remotePath;
 
-			logger().info() << "Started cleanup after cancellation.";
+			    logger().info() << "Started cleanup after cancellation.";
 
-            closeStreamFile();
-            curl_easy_reset(m_transferHandle.m_curlHandle.get());
+                closeStreamFile();
+                curl_easy_reset(m_transferHandle.m_curlHandle.get());
 
-            m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
-                m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+                m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                    m_transferHandle.m_transferStatus.m_totalBytes) * 100;
 
-            onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+                onTransferStatusUpdated(m_transferHandle.m_transferStatus);
 
-			deleteLocalFile(m_transferFile.m_localPath);
+			    deleteLocalFile(m_transferFile.m_localPath);
 
-			logger().info() << "Cleanup after cancellation completed.";
+			    logger().info() << "Cleanup after cancellation completed.";
+
+            }
+            else {
+                m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Paused;
+
+                logger().info() << "File: " << m_transferFile.m_localPath
+                    << " was paused during download from: " << m_transferFile.m_remotePath;
+
+                logger().info() << "Started cleanup after pause.";
+
+                closeStreamFile();
+                curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+                m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                    m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+                onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+
+                logger().info() << "Cleanup after pause completed.";
+            }
 
             return;
         }
@@ -150,6 +182,101 @@ void TransferJob::downloadFile() {
         onTransferStatusUpdated(m_transferHandle.m_transferStatus);
     }
 }
+void TransferJob::resumeDownloadFile() {
+    if (m_transferHandle.m_curlHandle.get()) {
+
+        m_transferFile.m_stream = fopen(m_transferFile.m_localPath.c_str(), "ab");
+        if (!m_transferFile.m_stream) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+
+            logger().error() << "Failed to open file for writing. Source: " << m_transferFile.m_localPath;
+            return;
+        }
+
+        std::string encodedUrl = urlEncoder(m_transferFile.m_remotePath);
+
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_URL, (m_url + encodedUrl).c_str());
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_BUFFERSIZE, 131072L); // 128KB
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEFUNCTION, TransferJob::WriteCallback);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_WRITEDATA, this);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_RESUME_FROM_LARGE, static_cast<curl_off_t>(m_transferHandle.m_transferStatus.m_bytesTransferred));
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFOFUNCTION, TransferJob::xferinfoCallback);
+
+        m_transferHandle.m_transferStatus.m_startTime = QDateTime::currentDateTime();
+        m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::InProgress;
+
+        CURLcode res = curl_easy_perform(m_transferHandle.m_curlHandle.get());
+
+        if (res == CURLE_ABORTED_BY_CALLBACK) {
+            if (m_transferHandle.m_cancelled.load(std::memory_order_relaxed)) {
+                m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Cancelled;
+
+                logger().info() << "File: " << m_transferFile.m_localPath
+                    << " was cancelled during download from: " << m_transferFile.m_remotePath;
+
+                logger().info() << "Started cleanup after cancellation.";
+
+                closeStreamFile();
+                curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+                m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                    m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+                onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+
+                deleteLocalFile(m_transferFile.m_localPath);
+
+                logger().info() << "Cleanup after cancellation completed.";
+
+            }
+            else {
+                m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Paused;
+
+                logger().info() << "File: " << m_transferFile.m_localPath
+                    << " was paused during download from: " << m_transferFile.m_remotePath;
+
+                logger().info() << "Started cleanup after pause.";
+
+                closeStreamFile();
+                curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+                m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+                    m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+                onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+
+                logger().info() << "Cleanup after pause completed.";
+            }
+
+            return;
+        }
+        else if (res == CURLE_OK) {
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Completed;
+
+            logger().info() << "Finished downloading Source: " << m_transferFile.m_remotePath;
+        }
+        else {
+            m_transferHandle.m_transferStatus.m_curlResCode = (int)res;
+            m_transferHandle.m_transferStatus.m_state = TransferStatus::TransferState::Failed;
+
+            logger().error() << "Error while downloading Source: '" << m_transferFile.m_remotePath
+                << "' to destination: " << m_transferFile.m_localPath
+                << "'. Error: " << std::string(curl_easy_strerror(res));
+
+        }
+
+        closeStreamFile();
+        curl_easy_reset(m_transferHandle.m_curlHandle.get());
+
+        m_transferHandle.m_transferStatus.m_progress = (static_cast<double>(m_transferHandle.m_transferStatus.m_bytesTransferred) /
+            m_transferHandle.m_transferStatus.m_totalBytes) * 100;
+
+        onTransferStatusUpdated(m_transferHandle.m_transferStatus);
+    }
+}
+
 void TransferJob::uploadFile() {
     if (m_transferHandle.m_curlHandle.get()) {
         m_transferFile.m_stream = fopen(m_transferFile.m_localPath.c_str(), "rb");
@@ -168,7 +295,7 @@ void TransferJob::uploadFile() {
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_UPLOAD_BUFFERSIZE, 131072L); // 128KB
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READFUNCTION, TransferJob::ReadCallback);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_READDATA, this);
-        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle.m_cancelled);
+        curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFODATA, &m_transferHandle);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_NOPROGRESS, 0L);
         curl_easy_setopt(m_transferHandle.m_curlHandle.get(), CURLOPT_XFERINFOFUNCTION, TransferJob::xferinfoCallback);
        
@@ -388,7 +515,13 @@ uint64_t TransferJob::createJob(const std::string localPath, const std::string r
 }
 
 void TransferJob::cancelJob() {
+	logger().error() << "Cancel variable has been set to true!";
+	logger().error() << "Someone called cancelJob() method!";  
     m_transferHandle.m_cancelled.store(true); 
+}
+
+void TransferJob::pauseJob() {
+	m_transferHandle.m_paused.store(true);
 }
 
 TransferJob::~TransferJob() {
@@ -401,4 +534,9 @@ void TransferJob::closeStreamFile() {
         m_transferFile.m_stream = nullptr;
     }
 }
+
+void TransferJob::setJobId(uint64_t jobId) {
+    m_jobId = jobId;
+    m_transferHandle.m_transferStatus.m_jobId = jobId;
+}   
 
