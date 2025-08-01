@@ -13,6 +13,7 @@ private:
     std::shared_ptr<CURL> m_curlHandle;
     TransferStatus m_transferStatus;
 	std::atomic<bool> m_cancelled{ false };
+	std::atomic<bool> m_paused{ false };
 
 public:
     TransferHandle();
