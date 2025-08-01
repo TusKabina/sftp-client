@@ -51,7 +51,8 @@ enum class JobOperation {
     MOVE,
     DELETE,
     DELETE_LOCAL,
-    MKDIR
+    MKDIR,
+    RESUME
 
 };
 
@@ -62,7 +63,7 @@ signals:
    
 private:
     DirectoryCache m_DirectoryCache;
-    std::vector<TransferHandle> m_transferHandles;
+   // std::vector<TransferHandle> m_transferHandles;
     std::vector<TransferJob*> m_transferJobs;
     std::string m_username;
     std::string m_password;
@@ -74,6 +75,7 @@ private:
 
 private:
     void downloadJob(TransferJob* job);
+    void resumeJob(TransferJob* job);
 	void uploadJob(TransferJob* job, const std::string& source);
     void copyJob(TransferJob* job, const std::string& source);
     void moveJob(TransferJob* job, const std::string& source, const std::string& destination);
@@ -86,7 +88,6 @@ public:
     TransferManager(QObject* parent)
         : QObject(parent), m_initialized(false) {}
 
-    TransferHandle& findFreeHandle();
     const TransferJob* getJob(uint64_t  jobId)  const;
 
     void setCredentials(const std::string& host, const std::string& username, const std::string& password);
@@ -98,6 +99,7 @@ public:
 
     [[nodiscard]] const std::vector<DirectoryEntry> getDirectoryList(const std::string& path = "");
     [[nodiscard]] uint64_t prepareJob(const std::string localPath, const std::string remotePath);
+    [[nodiscard]] uint64_t prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t jobId);
     [[nodiscard]] bool isInitialized() const { return m_initialized; }
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_DirectoryCache.getCache(); }
     [[nodiscard]] const std::string& getUsername() { return m_username; }
@@ -109,6 +111,8 @@ public:
 
     void submitJob(uint64_t jobId, JobOperation jobType);
     void cancelJob(uint64_t jobId);
+    void pauseJob(uint64_t jobId);
+    void resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransferred, const uint64_t jobId);
 
     ~TransferManager();
 

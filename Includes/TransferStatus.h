@@ -12,6 +12,7 @@ struct TransferStatus {
         Completed,
         Failed,
         Cancelled,
+        Paused,
         Unknown
     };
     TransferState m_state;

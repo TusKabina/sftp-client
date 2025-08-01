@@ -20,6 +20,9 @@ std::ostream &operator<<(std::ostream& os, TransferStatus::TransferState state) 
         case TransferStatus::TransferState::Cancelled:
             os << "Canceled";
             break;
+		case TransferStatus::TransferState::Paused:
+            os << "Paused";
+			break;
         case TransferStatus::TransferState::Unknown:
             os << "Unknown";
         default:
@@ -126,6 +129,10 @@ const std::string TransferStatus::TransferStatetoString() const {
         break;
     case TransferStatus::TransferState::Unknown:
         strState = "Unknown";
+        break;
+	case TransferStatus::TransferState::Paused:
+        strState = "Paused";
+        break;
     default:
         strState = "Invalid State";
         break;

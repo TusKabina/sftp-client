@@ -4,6 +4,7 @@
 #include <qstring.h>
 #include "Utilities/MeasureHelper.h"
 #include "Utilities/Logger.h"
+#include <filesystem>
 
 void TransferManager::setCredentials(const std::string& host, const std::string& username, const std::string& password) {
     m_url = "sftp://" + username + ":" + password + "@" + host;
@@ -14,6 +15,21 @@ void TransferManager::setCredentials(const std::string& host, const std::string&
 uint64_t TransferManager::prepareJob(const std::string localPath, const std::string remotePath) {
     QMutexLocker locker(&m_mutex);
     TransferJob* job = new TransferJob(localPath, remotePath, m_url);
+    
+    m_transferJobs.push_back(job);
+
+    QObject::connect(job, SIGNAL(onTransferStatusUpdated(TransferStatus)),
+        this, SLOT(onTransferStatusReceived(TransferStatus)));
+    return m_transferJobs.back()->getJobId();
+}
+
+uint64_t TransferManager::prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t jobId) {
+    QMutexLocker locker(&m_mutex);
+    TransferJob* job = new TransferJob(localPath, remotePath, m_url);
+
+	job->setFileBytesTransferred(bytesTransferred);
+	job->setJobId(jobId);
+
     m_transferJobs.push_back(job);
 
     QObject::connect(job, SIGNAL(onTransferStatusUpdated(TransferStatus)),
@@ -76,6 +92,9 @@ void TransferManager::executeJob(const uint64_t jobId, JobOperation jobType, std
        case JobOperation::MKDIR:
            mkdirJob(*job, remoteDirPath);
            break;
+	   case JobOperation::RESUME:
+		   resumeJob(*job);
+           break;
     }
 }
 
@@ -94,6 +113,33 @@ void TransferManager::cancelJob(uint64_t jobId) {
         return;
     }
 	(*job)->cancelJob();
+}
+
+void TransferManager::pauseJob(uint64_t jobId) {
+    auto job = std::find_if(m_transferJobs.begin(), m_transferJobs.end(),[&jobId](const TransferJob* transferJob) {
+        return transferJob->getJobId() == jobId;
+    });
+    
+    if (job == m_transferJobs.end()) {
+        logger().critical() << "Job with job ID: " << jobId << " Not found!";
+        return;
+    }
+
+    (*job)->pauseJob();
+}
+
+void TransferManager::resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransfered, const uint64_t jobId) {
+
+    if (std::filesystem::exists(localPath)) {
+        logger().debug() << "Resuming job for file: " << localPath;
+    } 
+    else {
+        logger().error() << "File does not exist: " << localPath;
+        return;
+    }
+
+    uint64_t resumeJobId = prepareJobToResume(localPath, remotePath, bytesTransfered, jobId);
+    submitJob(resumeJobId, JobOperation::RESUME);
 }
 
 const TransferJob* TransferManager::getJob(uint64_t jobId) const {
@@ -117,6 +163,16 @@ void TransferManager::downloadJob(TransferJob* job) {
 
     job->downloadFile();
 
+}
+
+void TransferManager::resumeJob(TransferJob* job)
+{
+    {
+        QMutexLocker locker(&m_mutex);
+        uint64_t totalBytes = m_DirectoryCache.getTotalBytes(job->getRemotePath());
+        job->setFileTotalBytes(totalBytes);
+    }
+    job->resumeDownloadFile();
 }
 
 void TransferManager::uploadJob(TransferJob* job, const std::string& source) {
@@ -181,22 +237,8 @@ void TransferManager::mkdirJob(TransferJob* job, const std::string& source) {
     }
 }
 
-TransferHandle &TransferManager::findFreeHandle() {
-    auto handle = std::find_if(begin(m_transferHandles), end(m_transferHandles), [](const TransferHandle& handle) {
-        return handle.getTransferStatus().m_state == TransferStatus::TransferState::Initialized;
-        });
-    if (handle != m_transferHandles.end()) {
-        return *handle;
-    }
-}
-
 void TransferManager::reset() {
     m_DirectoryCache.reset();
-
-    for (auto& handle : m_transferHandles) {
-        handle.m_curlHandle.reset();
-        handle.m_transferStatus.reset();
-    }
 
     for (TransferJob* job : m_transferJobs) {
         delete job;
