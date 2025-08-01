@@ -209,7 +209,7 @@ void TreeViewWidget::deleteTreeItems(QTreeWidgetItem* item) {
 void TreeViewWidget::processUpdateTreeView(const std::vector<DirectoryEntry>& entries, const std::string& path) {
 	m_treeWidget->setUpdatesEnabled(false);
 	if (entries.empty()) {
-		//m_treeWidget->setUpdatesEnabled(true);
+		m_treeWidget->setUpdatesEnabled(true);
 		return;
 	}
 	auto startOverall = std::chrono::high_resolution_clock::now();
@@ -433,10 +433,15 @@ void TreeViewWidget::constructTransferStatusWidget() {
 
 	m_cancelAction = m_transferStatusContextMenu->addAction(trUtf8("Cancel"));
 	m_removeAction = m_transferStatusContextMenu->addAction(trUtf8("Remove"));
-
+	m_pauseAction = m_transferStatusContextMenu->addAction(trUtf8("Pause"));
+	m_resumeAction = m_transferStatusContextMenu->addAction(trUtf8("Resume"));
 
 	connect(m_cancelAction, &QAction::triggered, this, &TreeViewWidget::onCancelAction);
 	connect(m_removeAction, &QAction::triggered, this, &TreeViewWidget::onRemoveAction);
+	connect(m_pauseAction, &QAction::triggered, this, &TreeViewWidget::onPauseAction);
+	connect(m_resumeAction, &QAction::triggered, this, &TreeViewWidget::onResumeAction);
+
+	m_resumeAction->setEnabled(false);
 
 }
 
@@ -532,7 +537,8 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 
 	if (transferStatus.m_progress >= 100 || 
 		transferStatus.m_state == TransferStatus::TransferState::Cancelled || 
-		transferStatus.m_state == TransferStatus::TransferState::Failed) {
+		transferStatus.m_state == TransferStatus::TransferState::Failed || 
+		transferStatus.m_state == TransferStatus::TransferState::Paused) {
 
 		item->setText(static_cast<int>(TransferStatusHeader::SPEED), "0.000 MB/s");
 	}
@@ -1247,7 +1253,7 @@ void TreeViewWidget::onDeleteLocalAction() {
 }
 
 void TreeViewWidget::onCancelAction() {
-	logger().debug() << "Cancel action triggered";
+	logger().error() << "Cancel action triggered";
 	
 	if (m_transferStatusWidget->currentItem()) {
 		QTreeWidgetItem* currentItem = m_transferStatusWidget->currentItem();
@@ -1256,7 +1262,7 @@ void TreeViewWidget::onCancelAction() {
 		logger().debug() << "Cancelling job with ID: " << jobId;
 
 		m_manager.cancelJob(jobId);
-		m_transferStatusWidget->removeItemWidget(currentItem, 0);
+		//m_transferStatusWidget->removeItemWidget(currentItem, 0);
 	
 	}
 	else {
@@ -1272,7 +1278,9 @@ void TreeViewWidget::onRemoveAction() {
 
 		if (transferStatus == "Completed" || transferStatus == "Cancelled" || transferStatus == "Failed") {
 			logger().info() << "Removing transfer item: " << currentItem->text(0).toStdString();
-			m_transferStatusWidget->removeItemWidget(currentItem, 0);
+			
+			int row = m_transferStatusWidget->indexOfTopLevelItem(currentItem);
+			auto* taken = m_transferStatusWidget->takeTopLevelItem(row);
 			delete currentItem;
 		}
 		else {
@@ -1285,10 +1293,48 @@ void TreeViewWidget::onRemoveAction() {
 	}
 }
 
+void TreeViewWidget::onPauseAction() {
+	logger().debug() << "Puse action triggered";
+
+	if (m_transferStatusWidget->currentItem()) {
+		QTreeWidgetItem* currentItem = m_transferStatusWidget->currentItem();
+		uint64_t jobId = m_transferItems.key(currentItem, 0);
+
+		logger().debug() << "Pausing job with ID: " << jobId;
+
+		m_manager.pauseJob(jobId);
+		m_resumeAction->setEnabled(true);
+
+	}
+	else {
+		logger().warning() << "No transfer item selected to pause.";
+	}
+}
+
+void TreeViewWidget::onResumeAction() {
+	logger().debug() << "Resume action triggered";
+	if (m_transferStatusWidget->currentItem()) {
+		QTreeWidgetItem* currentItem = m_transferStatusWidget->currentItem();
+		uint64_t jobId = m_transferItems.key(currentItem, 0);
+
+		std::string localPath = currentItem->text(static_cast<int>(TransferStatusHeader::SOURCE)).toStdString();
+		std::string remotePath = currentItem->text(static_cast<int>(TransferStatusHeader::DESTINATION)).toStdString();
+		uint64_t bytesTransferred = currentItem->text(static_cast<int>(TransferStatusHeader::BYTES_TRANSFERRED)).toULongLong();
+		
+		logger().debug() << "Resuming job with ID: " << jobId;
+		m_resumeAction->setEnabled(false);
+		m_manager.resumeJob(localPath, remotePath, bytesTransferred, jobId);
+	}
+	else {
+		logger().warning() << "No transfer item selected to resume.";
+	}
+}
+
 void TreeViewWidget::onRenameLocalAction() {
 	QModelIndex idx = m_treeView->currentIndex();
 	if (idx.isValid()) {
 		m_treeView->edit(idx);
+
 	}
 }
 

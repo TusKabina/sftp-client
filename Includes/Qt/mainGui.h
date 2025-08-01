@@ -77,6 +77,8 @@ public slots:
 	void onDeleteLocalAction();
 	void onCancelAction();
 	void onRemoveAction();
+	void onPauseAction();
+	void onResumeAction();
 	void onRenameLocalAction();
 	void onCopyLocalAction();
 	void onCutLocalAction();
@@ -184,6 +186,8 @@ private:
 	QAction* m_renameLocalAction;
 	QAction* m_cancelAction;
 	QAction* m_removeAction;
+	QAction* m_pauseAction;
+	QAction* m_resumeAction;
 
 };
 
