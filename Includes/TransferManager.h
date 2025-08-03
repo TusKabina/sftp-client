@@ -99,7 +99,7 @@ public:
 
     [[nodiscard]] const std::vector<DirectoryEntry> getDirectoryList(const std::string& path = "");
     [[nodiscard]] uint64_t prepareJob(const std::string localPath, const std::string remotePath);
-    [[nodiscard]] uint64_t prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t jobId);
+    [[nodiscard]] uint64_t prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t totalBytes, const uint64_t jobId, const TransferStatus::TransferOperation operation);
     [[nodiscard]] bool isInitialized() const { return m_initialized; }
     [[nodiscard]] const std::map<std::string, std::vector<DirectoryEntry>>& getCache() const { return m_DirectoryCache.getCache(); }
     [[nodiscard]] const std::string& getUsername() { return m_username; }
@@ -112,7 +112,8 @@ public:
     void submitJob(uint64_t jobId, JobOperation jobType);
     void cancelJob(uint64_t jobId);
     void pauseJob(uint64_t jobId);
-    void resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransferred, const uint64_t jobId);
+    void resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransferred, const uint64_t totalBytes, const uint64_t jobId,
+                    const TransferStatus::TransferOperation operation);
 
     ~TransferManager();
 
