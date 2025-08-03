@@ -80,6 +80,7 @@ public slots:
 	void onPauseAction();
 	void onResumeAction();
 	void onRenameLocalAction();
+	void onRenameRemoteAction();
 	void onCopyLocalAction();
 	void onCutLocalAction();
 	void onPasteLocalAction();
@@ -92,7 +93,8 @@ public:
 		DESTINATION,
 		BYTES_TRANSFERRED,
 		SPEED,
-		PROGRESS
+		PROGRESS,
+		OPERATION
 	};
 	TreeViewWidget();
 	void populateTreeView();
@@ -171,19 +173,23 @@ private:
 	QMenu* m_RemoteContextMenu;
 	QMenu* m_transferStatusContextMenu;
 
-	// QActions for context menus
+	// QActions for remote context menus
 	QAction* m_downloadRemoteAction;
 	QAction* m_copyRemoteAction;
 	QAction* m_cutRemoteAction;
 	QAction* m_pasteRemoteAction;
 	QAction* m_deleteRemoteAction;
 	QAction* m_uploadRemoteAction;
+	QAction* m_renameRemoteAction;
+	// QActions for local context menus
 	QAction* m_deleteLocalAction;
 	QAction* m_uploadLocalAction;
 	QAction* m_cutLocalAction;
 	QAction* m_copyLocalAction;
 	QAction* m_pasteLocalAction;
 	QAction* m_renameLocalAction;
+
+	// QActions for transfer status context menu
 	QAction* m_cancelAction;
 	QAction* m_removeAction;
 	QAction* m_pauseAction;

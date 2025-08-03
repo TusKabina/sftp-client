@@ -418,9 +418,9 @@ void TreeViewWidget::constructTransferStatusWidget() {
 	// Add transfer status widget
 	m_transferStatusWidget = new TreeWidget(this);
 	m_transferStatusWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_transferStatusWidget->setColumnCount(7);
+	m_transferStatusWidget->setColumnCount(8);
 	m_transferStatusWidget->setHeaderLabels(QStringList() << "File Name" << "State" << "Local Path" << "Remote Path"
-		<< "Bytes Transferred" << "Speed" << "Progress");
+		<< "Bytes Transferred" << "Speed" << "Progress" << "Operation");
 	m_transferStatusWidget->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	m_transferStatusWidget->setSortingEnabled(true);
 
@@ -535,6 +535,9 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 	item->setText(static_cast<int>(TransferStatusHeader::DESTINATION), QString::fromStdString(transferStatus.m_destination));
 	item->setText(static_cast<int>(TransferStatusHeader::BYTES_TRANSFERRED), QString::number(transferStatus.m_bytesTransferred));
 
+	// Store total bytes so it can later on be fetched when paused operation is resumed
+	item->setData(0, Qt::UserRole, QVariant::fromValue<uint64_t>(transferStatus.m_totalBytes));
+
 	if (transferStatus.m_progress >= 100 || 
 		transferStatus.m_state == TransferStatus::TransferState::Cancelled || 
 		transferStatus.m_state == TransferStatus::TransferState::Failed || 
@@ -546,6 +549,7 @@ void TreeViewWidget::onTransferStatusUpdated(const TransferStatus& transferStatu
 		item->setText(static_cast<int>(TransferStatusHeader::SPEED), QString::number(transferStatus.m_speed) + " MB/s");
 	}
 	item->setText(static_cast<int>(TransferStatusHeader::PROGRESS), QString::number(transferStatus.m_progress,'f',2) + " %");
+	item->setText(static_cast<int>(TransferStatusHeader::OPERATION), QString::fromStdString(transferStatus.transferOperationToString()));
 }
 
 void TreeViewWidget::onCopyAction() {
@@ -1319,11 +1323,16 @@ void TreeViewWidget::onResumeAction() {
 
 		std::string localPath = currentItem->text(static_cast<int>(TransferStatusHeader::SOURCE)).toStdString();
 		std::string remotePath = currentItem->text(static_cast<int>(TransferStatusHeader::DESTINATION)).toStdString();
+		
+		std::string operation = currentItem->text(static_cast<int>(TransferStatusHeader::OPERATION)).toStdString();
+		TransferStatus::TransferOperation transferOperation = TransferStatus::transferOperationFromString(operation);
+		
 		uint64_t bytesTransferred = currentItem->text(static_cast<int>(TransferStatusHeader::BYTES_TRANSFERRED)).toULongLong();
+		uint64_t totalBytes = currentItem->data(0, Qt::UserRole).toULongLong();
 		
 		logger().debug() << "Resuming job with ID: " << jobId;
 		m_resumeAction->setEnabled(false);
-		m_manager.resumeJob(localPath, remotePath, bytesTransferred, jobId);
+		m_manager.resumeJob(localPath, remotePath, bytesTransferred, totalBytes, jobId, transferOperation);
 	}
 	else {
 		logger().warning() << "No transfer item selected to resume.";
@@ -1336,6 +1345,10 @@ void TreeViewWidget::onRenameLocalAction() {
 		m_treeView->edit(idx);
 
 	}
+}
+
+void TreeViewWidget::onRenameRemoteAction() {
+
 }
 
 void TreeViewWidget::onCopyLocalAction() {
