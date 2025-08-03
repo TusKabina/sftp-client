@@ -41,6 +41,7 @@ public:
     [[nodiscard]] const std::string& getLocalPath() const { return m_transferFile.m_localPath;}
     [[nodiscard]] const std::string& getRemotePath() const {return m_transferFile.m_remotePath;}
     [[nodiscard]] const std::string& getUrl() const {return m_url;}
+	[[nodiscard]] TransferStatus::TransferOperation getJobOperation() const { return m_transferHandle.m_transferStatus.m_operation; }
     [[nodiscard]] uint64_t getJobId() const {return m_jobId;}
     [[nodiscard]] uint64_t getBytesTransferred() const {return m_transferFile.m_bytesTransfered;}
 
@@ -51,7 +52,9 @@ public:
     void setTransferHandle(std::shared_ptr<CURL> curlHandle) { m_transferHandle.m_curlHandle = curlHandle; }
     void closeStreamFile();
     void setFileTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
+	void setJobOperation(const TransferStatus::TransferOperation operation) { m_transferHandle.m_transferStatus.m_operation = operation; }
 	void setFileBytesTransferred(uint64_t bytesTransferred) { m_transferHandle.m_transferStatus.m_bytesTransferred = bytesTransferred; }
+	void setTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
     uint64_t createJob(const std::string localPath, const std::string remotePath, const std::string url);
     void cancelJob();
     void pauseJob();
@@ -68,6 +71,7 @@ private:
 public:
     void downloadFile();
 	void resumeDownloadFile();
+	void resumeUploadFile();
     void uploadFile();
     void copyFile();
     void moveFile();
