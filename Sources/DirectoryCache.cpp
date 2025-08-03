@@ -173,19 +173,21 @@ std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& pat
 bool DirectoryCache::isFile(const std::string& path) {
     QMutexLocker locker(&m_mutex);
     size_t pos = path.find_last_of("/");
-    std::string directoryPath = path.substr(0, pos);
+    std::string directoryPath = path.substr(0, pos + 1);
     std::string fileName = path.substr(pos + 1, path.size());
-
-    if (isPathInCache(directoryPath)) {
-        return false;
+   
+    try {
+        const auto& entries = m_cache.at(directoryPath);
+        auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
+            return entry.m_name == fileName; 
+        });
+        return it != entries.end() && it->m_isFile;
     }
+    catch (const std::out_of_range& e) {
+        logger().error() << "Directory not found in cache: " << directoryPath;
+        return false;
+	}
 
-    const auto& entries = m_cache.at(directoryPath);
-    auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
-        return entry.m_name == fileName; 
-    });
-
-    return it != entries.end() && it->m_isFile;
 }
 
 const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
