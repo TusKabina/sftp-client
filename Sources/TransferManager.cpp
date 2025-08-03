@@ -23,12 +23,15 @@ uint64_t TransferManager::prepareJob(const std::string localPath, const std::str
     return m_transferJobs.back()->getJobId();
 }
 
-uint64_t TransferManager::prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t jobId) {
+uint64_t TransferManager::prepareJobToResume(const std::string localPath, const std::string remotePath, const uint64_t bytesTransferred, const uint64_t totalBytes, 
+                                                const uint64_t jobId, const TransferStatus::TransferOperation operation) {
     QMutexLocker locker(&m_mutex);
     TransferJob* job = new TransferJob(localPath, remotePath, m_url);
 
 	job->setFileBytesTransferred(bytesTransferred);
 	job->setJobId(jobId);
+	job->setJobOperation(operation);
+	job->setTotalBytes(totalBytes);
 
     m_transferJobs.push_back(job);
 
@@ -128,17 +131,31 @@ void TransferManager::pauseJob(uint64_t jobId) {
     (*job)->pauseJob();
 }
 
-void TransferManager::resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransfered, const uint64_t jobId) {
+void TransferManager::resumeJob(const std::string& localPath, const std::string& remotePath, const uint64_t bytesTransfered, const uint64_t totalBytes, const uint64_t jobId,
+                                const TransferStatus::TransferOperation operation) {
 
-    if (std::filesystem::exists(localPath)) {
-        logger().debug() << "Resuming job for file: " << localPath;
-    } 
-    else {
-        logger().error() << "File does not exist: " << localPath;
-        return;
+	// If operation is Download, check if the local file exists
+    if (operation == TransferStatus::TransferOperation::Download) {
+        if (std::filesystem::exists(localPath)) {
+            logger().debug() << "Resuming job for file: " << localPath;
+        } 
+        else {
+            logger().error() << "File does not exist: " << localPath;
+            return;
+        }
     }
+    // If operation is Upload, check if the remote file exists
+    else if (operation == TransferStatus::TransferOperation::Upload) {
+        if (m_DirectoryCache.isFile(remotePath)) {
+            logger().debug() << "Resuming job for file: " << remotePath;
+        } 
+        else {
+            logger().error() << "Remote file does not exist: " << remotePath;
+            return;
+        }
+	}
 
-    uint64_t resumeJobId = prepareJobToResume(localPath, remotePath, bytesTransfered, jobId);
+    uint64_t resumeJobId = prepareJobToResume(localPath, remotePath, bytesTransfered, totalBytes, jobId, operation);
     submitJob(resumeJobId, JobOperation::RESUME);
 }
 
@@ -159,6 +176,7 @@ void TransferManager::downloadJob(TransferJob* job) {
         QMutexLocker locker(&m_mutex);
         uint64_t totalBytes = m_DirectoryCache.getTotalBytes(job->getRemotePath());
         job->setFileTotalBytes(totalBytes);
+		job->setJobOperation(TransferStatus::TransferOperation::Download);
     }
 
     job->downloadFile();
@@ -167,12 +185,23 @@ void TransferManager::downloadJob(TransferJob* job) {
 
 void TransferManager::resumeJob(TransferJob* job)
 {
+    switch (job->getJobOperation())
     {
-        QMutexLocker locker(&m_mutex);
-        uint64_t totalBytes = m_DirectoryCache.getTotalBytes(job->getRemotePath());
-        job->setFileTotalBytes(totalBytes);
+        case TransferStatus::TransferOperation::Download:
+            job->resumeDownloadFile();
+            break;
+        case TransferStatus::TransferOperation::Upload:
+            job->resumeUploadFile();
+            {
+				QMutexLocker locker(&m_mutex);
+                std::string source = job->getRemoteDirectoryPath() + "/";
+                m_DirectoryCache.refreshDirectory(source);
+            }
+            break;
+
+        default:
+            break;
     }
-    job->resumeDownloadFile();
 }
 
 void TransferManager::uploadJob(TransferJob* job, const std::string& source) {
@@ -182,6 +211,7 @@ void TransferManager::uploadJob(TransferJob* job, const std::string& source) {
     uint64_t totalBytes = localFile.size();
 
     job->setFileTotalBytes(totalBytes);
+    job->setJobOperation(TransferStatus::TransferOperation::Upload);
     job->uploadFile();
 
     {
@@ -195,6 +225,7 @@ void TransferManager::copyJob(TransferJob* job, const std::string& source) {
         QMutexLocker locker(&m_mutex);
         uint64_t totalBytes = m_DirectoryCache.getTotalBytes(job->getLocalPath());
         job->setFileTotalBytes(totalBytes);
+        job->setJobOperation(TransferStatus::TransferOperation::Copy);
     }
     
     job->copyFile();
