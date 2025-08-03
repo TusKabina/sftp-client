@@ -139,3 +139,41 @@ const std::string TransferStatus::TransferStatetoString() const {
     }
     return strState;
 }
+
+const std::string TransferStatus::transferOperationToString() const
+{
+	std::string strOperation;
+    switch (m_operation)
+    {
+        case TransferStatus::TransferOperation::Download:
+            strOperation = "Download";
+			break;
+        case TransferStatus::TransferOperation::Upload:
+			strOperation = "Upload";
+            break;
+		case TransferStatus::TransferOperation::Copy:
+			strOperation = "Copy";
+            break;
+    default:
+		strOperation = "Unknown";
+        break;
+    }
+    return strOperation;
+}
+
+const TransferStatus::TransferOperation TransferStatus::transferOperationFromString(const std::string& operation)
+{
+    if (operation == "Download") {
+		return TransferStatus::TransferOperation::Download;
+    }
+	else if (operation == "Upload") {
+        return TransferStatus::TransferOperation::Upload;
+    }
+    else if (operation == "Copy") {
+        return TransferStatus::TransferOperation::Copy;
+    }
+    else {
+        return TransferStatus::TransferOperation::Unknown;
+    }
+    
+}
