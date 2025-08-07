@@ -100,7 +100,7 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
         else {
             m_initialized = true;
         }
-        curl_easy_reset(m_curlHandle.get());
+        //curl_easy_reset(m_curlHandle.get());
     }
     else {
         m_initialized = false;
@@ -114,68 +114,88 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     if (depth == 0) {
         return;
     }
+
+    //logger().debug() << "Pre fetching directory: " << path;
+    
     std::vector<DirectoryEntry> entries;
     entries = listDirectory(path);
+
     if (entries.empty()) {
-            return;
+        return;
     }
-    m_cache[path] = entries;
+	
+    {
+        QMutexLocker locker(&m_mutex);
+        m_cache[path] = entries;
+    }
+    int i = 0;
+    int currentModulo = 1000;
     for (const auto& entry : entries) {
         if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
             std::string subPath;
             subPath = path + entry.m_name + "/";
             prefetchDirectories(subPath, depth - 1);
         }
+
+        i++;
+        if (i > currentModulo) {
+			currentModulo *= 1.5; // Increase the modulo to reduce frequency of updates
+        }
+        if (i % currentModulo == 0) {
+			emit onDirectoryUpdated(path);
+        }
     }
-    logger().debug() << "Pre fetching directory: " << path;
+    
 
 }
 
 void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
+	logger().debug() << "Updating directory cache for path: " << path << " with depth: " << depth;
     prefetchDirectories(path, depth);
 }
 
 std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& path) {
-    //QMutexLocker locker(&m_mutex);
     std::vector<DirectoryEntry> entries;
-    if (!m_curlHandle.get()) {
-        return entries;
-    }
     std::string encodedPath = urlEncode(path);
     std::string fullUrl = m_baseUrl + encodedPath;
     std::string response;
-   // std::string encodedUrl = urlEncode(fullUrl);
+    CURLcode res = (CURLcode)-1;
 
+    {
+        QMutexLocker locker(&m_mutex);
+        
+        if (!m_curlHandle.get()) {
+            return entries;
+        }
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
+    
+        res = curl_easy_perform(m_curlHandle.get());   
+     
+        if (res != CURLE_OK) {
+            m_curlCode = static_cast<int>(res);
+		
+           // curl_easy_reset(m_curlHandle.get());
 
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
-
-    CURLcode res = curl_easy_perform(m_curlHandle.get());
-
-    if (res != CURLE_OK) {
-        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
-        //logger().error() << curl_easy_strerror(res) << ": " << path;
-        logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
-        m_curlCode = static_cast<int>(res);
-        curl_easy_reset(m_curlHandle.get());
-        return entries;
-    }
-    else {
-        logger().debug() << "Directory listing of: " << path << " Successful.";
+            logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
+        
+            return entries;
+        }
+        //curl_easy_reset(m_curlHandle.get());
     }
 
     parseResponse(entries, response);
-    curl_easy_reset(m_curlHandle.get());
     return entries;
 }
 
 bool DirectoryCache::isFile(const std::string& path) {
-    QMutexLocker locker(&m_mutex);
     size_t pos = path.find_last_of("/");
     std::string directoryPath = path.substr(0, pos + 1);
     std::string fileName = path.substr(pos + 1, path.size());
    
+    QMutexLocker locker(&m_mutex);
+    
     try {
         const auto& entries = m_cache.at(directoryPath);
         auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
@@ -195,8 +215,7 @@ const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
 	const std::string remoteFileName = Commons::FileName(path);
 
 	logger().debug() << "Getting total bytes for file: " << remoteFileName << " in directory: " << remoteDirectoryPath;
-
-   // QMutexLocker locker(&m_mutex);
+    
     if (!isPathInCache(remoteDirectoryPath)) {
 		logger().error() << "Directory not found in cache: " << remoteDirectoryPath;
         return 0;
@@ -230,10 +249,12 @@ bool DirectoryCache::isRegularFile(const std::string& filePath) {
 
 void DirectoryCache::refreshDirectory(const std::string& path) {
     std::vector<DirectoryEntry> entries = listDirectory(path);
-     m_cache[path] = entries;
+    
     {
-       // QMutexLocker locker(&m_mutex);
+        QMutexLocker locker(&m_mutex);
+        m_cache[path] = entries;
     }
+
     emit onDirectoryUpdated(path);
 }
 
