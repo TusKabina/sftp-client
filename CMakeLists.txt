@@ -1,63 +1,37 @@
 cmake_minimum_required(VERSION 3.19)
 
-# Set project name and version
-project(SftpClient VERSION 1.0)
-# Set C++ standard
+include(${CMAKE_SOURCE_DIR}/Version.cmake)
+project(SftpClient VERSION ${PROJECT_VERSION})
+
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_PREFIX_PATH "/home/irogulj/Qt/5.15.2/gcc_64")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(Includes)
-
-# Globbing header and source files
-file(GLOB HEADER_FILES "Includes/*.h")
-file(GLOB SOURCE_FILES "Sources/*.cpp")
+include_directories(${CMAKE_SOURCE_DIR}/Includes)
 
 
-# Find the Qt5 package
-find_package(Qt5 REQUIRED COMPONENTS Widgets Core)
-find_package(CURL REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Concurrent)
-# Enable automatic invocation of MOC
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -flto -fomit-frame-pointer")
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+
 set(CMAKE_AUTOMOC ON)
 
-# Add the executable
-add_executable(SftpClient main.cpp 
-        Includes/Qt/ThreadPool.h 
-        Includes/Qt/mainGui.h 
-        Includes/Qt/IconManager.h
-        Includes/Utilities/MeasureHelper.h
-        Includes/Utilities/Logger.h
-        Includes/Utilities/Commons.h
-        Includes/LocalOperations.h
-        Includes/HandleDeleter.h
-        Includes/TransferJob.h
-        Includes/TransferManager.h
-        Includes/TransferFile.h
-        Includes/TransferStatus.h
-        Includes/UIDGenerator.h  
-        Includes/DirectoryEntry.h
-        Includes/DirectoryCache.h 
-        Includes/TransferHandle.h
-        Sources/Qt/ThreadPool.cpp 
-        Sources/Qt/mainGui.cpp 
-        Sources/Utilities/Logger.cpp
-        Sources/TransferStatus.cpp
-        Sources/TransferJob.cpp
-        Sources/TransferManager.cpp
-        Sources/DirectoryCache.cpp
-        Sources/TransferHandle.cpp 
-        Sources/LocalOperations.cpp
+find_package(Qt5 REQUIRED COMPONENTS Widgets Core Concurrent)
+find_package(CURL REQUIRED)
+
+file(GLOB_RECURSE HEADER_FILES "Includes/*.h")
+file(GLOB_RECURSE SOURCE_FILES "Sources/*.cpp")
+
+add_executable(SftpClient ${SOURCE_FILES} ${HEADER_FILES} main.cpp)
+
+target_link_libraries(SftpClient PRIVATE
+    Qt5::Widgets
+    Qt5::Core
+    Qt5::Concurrent
+    ${CURL_LIBRARIES}
 )
 
-# Link the Qt5 Widgets library
-target_link_libraries(SftpClient Qt5::Widgets)
-target_link_libraries(SftpClient Qt5::Core)
-target_link_libraries(SftpClient Qt5::Concurrent)
-target_link_libraries(SftpClient ${CURL_LIBRARIES})
-
-# Add the .qrc file
 qt5_add_resources(RESOURCE_FILES Resources/Resources.qrc)
-
-# Include the resource files in the executable
 target_sources(SftpClient PRIVATE ${RESOURCE_FILES})
