@@ -7,14 +7,15 @@
   },
   "configurePresets": [
     {
-      "name": "default",
-      "hidden": true,
+      "name": "debug",
+      "displayName": "Debug Build",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "/home/irogulj/Qt/5.15.2/gcc_64",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
         "CMAKE_CXX_STANDARD": "17",
+        "CMAKE_PREFIX_PATH": "/home/irogulj/Qt/5.15.2/gcc_64",
         "Qt5_DIR": "/home/irogulj/Qt/5.15.2/gcc_64/lib/cmake/Qt5"
       },
       "environment": {
@@ -22,33 +23,31 @@
       }
     },
     {
-      "hidden": true,
-      "name": "Qt",
+      "name": "release",
+      "displayName": "Release Build",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_PREFIX_PATH": "$env{QTDIR}"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+        "CMAKE_CXX_STANDARD": "17",
+        "CMAKE_PREFIX_PATH": "/home/irogulj/Qt/5.15.2/gcc_64",
+        "Qt5_DIR": "/home/irogulj/Qt/5.15.2/gcc_64/lib/cmake/Qt5"
       },
-      "vendor": {
-        "qt-project.org/Qt": {
-          "checksum": "wVa86FgEkvdCTVp1/nxvrkaemJc="
-        }
+      "environment": {
+        "QT_QPA_PLATFORM_PLUGIN_PATH": "/home/irogulj/Qt/5.15.2/gcc_64/plugins/platforms"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "default",
-      "configurePreset": "default"
-    }
-  ],
-  "testPresets": [
+      "name": "debug",
+      "configurePreset": "debug"
+    },
     {
-      "name": "default",
-      "configurePreset": "default"
+      "name": "release",
+      "configurePreset": "release"
     }
   ],
-  "vendor": {
-    "qt-project.org/Presets": {
-      "checksum": "w1EQWUFxDmDSiGMPYlGFSl3GGGI="
-    }
-  }
+  "testPresets": []
 }
