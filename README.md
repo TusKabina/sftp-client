@@ -50,3 +50,5 @@ git clone <repo_url>
 5.  Visual Studio will automatically run `CMake` and configure the project. If not, go to `Project -> Configure SftpClient`.
 6.  Click `Build -> Build All` to compile.
 
+## License
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
