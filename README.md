@@ -4,7 +4,7 @@ SFTP Client is multi-threaded C++ Qt application for managing files over SFTP, d
 
 ![Application Screenshot](docs/screenshot.png)
 
-# Features
+## Features
 - Download files from SFTP server 
 - Upload files to SFTP server 
 - Move files between directories on the server 
@@ -17,12 +17,12 @@ SFTP Client is multi-threaded C++ Qt application for managing files over SFTP, d
 - Rename local file 
 - Delete local file 
 
-# Requirements
-- **QT 5.15.2** 
+## Requirements
+- **Qt 5.15.2** 
 - **libcurl** 
 - **CMake 3.19+** 
 
-# Build on Linux
+## Build on Linux
 ```bash
 git clone <repo_url>
 cd sftp-client
@@ -37,14 +37,14 @@ Run:
 ./SftpClient
 ```
 
-# Build With Visual Studio (cross-platform)
+## Build With Visual Studio (cross-platform)
 1. Clone the repository:
 ```bash
 git clone <repo_url>
 ```
 2. Open the project folder in Visual Studio
-3. Connect to the remote server with `cross-platform` option.
-4.  In `CMakePresets.json`, update the hard coded variables so they point to the correct path:
+3. Connect to the remote server using the `cross-platform` option.
+4.  In `CMakePresets.json`, update the hard-coded variables so they point to the correct path:
 	- `QT_DIR5`
 	- `QT_QPA_PLATFORM_PLUGIN_PATH`
 5.  Visual Studio will automatically run `CMake` and configure the project. If not, go to `Project -> Configure SftpClient`.
