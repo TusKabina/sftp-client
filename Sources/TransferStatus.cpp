@@ -17,9 +17,12 @@ std::ostream &operator<<(std::ostream& os, TransferStatus::TransferState state) 
         case TransferStatus::TransferState::Failed:
             os << "Failed";
             break;
-        case TransferStatus::TransferState::Canceled:
+        case TransferStatus::TransferState::Cancelled:
             os << "Canceled";
             break;
+		case TransferStatus::TransferState::Paused:
+            os << "Paused";
+			break;
         case TransferStatus::TransferState::Unknown:
             os << "Unknown";
         default:
@@ -44,7 +47,7 @@ TransferStatus::TransferStatus() {
     m_lowSpeedCount = 0;
     m_highSpeedCount = 0;
     m_thresholdCount = 5;
-    signal_threshold = static_cast<size_t>(1024) * 1024 * 2; // after how many MB to trigger signal for updating transfer status
+    m_signalThreshold = static_cast<size_t>(1024) * 1024 * 2; // after how many MB to trigger signal for updating transfer status
     m_threshold = 0;
     m_lastUpdateTime = QDateTime::currentDateTime();
 }
@@ -84,7 +87,7 @@ void TransferStatus::reset() {
     m_bytesTransferred = 0;
     m_totalBytes = 0;
     m_threshold = 0;
-    signal_threshold = 0;
+    m_signalThreshold = 0;
     m_lastBytesTransferred = 0;
     m_jobId = 0;
     m_source = "";
@@ -121,14 +124,56 @@ const std::string TransferStatus::TransferStatetoString() const {
     case TransferStatus::TransferState::Failed:
         strState = "Failed";
         break;
-    case TransferStatus::TransferState::Canceled:
-        strState = "Canceled";
+    case TransferStatus::TransferState::Cancelled:
+        strState = "Cancelled";
         break;
     case TransferStatus::TransferState::Unknown:
         strState = "Unknown";
+        break;
+	case TransferStatus::TransferState::Paused:
+        strState = "Paused";
+        break;
     default:
         strState = "Invalid State";
         break;
     }
     return strState;
+}
+
+const std::string TransferStatus::transferOperationToString() const
+{
+	std::string strOperation;
+    switch (m_operation)
+    {
+        case TransferStatus::TransferOperation::Download:
+            strOperation = "Download";
+			break;
+        case TransferStatus::TransferOperation::Upload:
+			strOperation = "Upload";
+            break;
+		case TransferStatus::TransferOperation::Copy:
+			strOperation = "Copy";
+            break;
+    default:
+		strOperation = "Unknown";
+        break;
+    }
+    return strOperation;
+}
+
+const TransferStatus::TransferOperation TransferStatus::transferOperationFromString(const std::string& operation)
+{
+    if (operation == "Download") {
+		return TransferStatus::TransferOperation::Download;
+    }
+	else if (operation == "Upload") {
+        return TransferStatus::TransferOperation::Upload;
+    }
+    else if (operation == "Copy") {
+        return TransferStatus::TransferOperation::Copy;
+    }
+    else {
+        return TransferStatus::TransferOperation::Unknown;
+    }
+    
 }

@@ -11,11 +11,10 @@
 #include <qobject.h>
 #include <cstdio>
 
-class TransferJob : public QObject{
+class TransferJob : public QObject {
     Q_OBJECT
 signals:
     void onTransferStatusUpdated(TransferStatus status);
-    void onErrorMessage(const std::string message);
 private:
     TransferHandle m_transferHandle;
     TransferFile m_transferFile;
@@ -42,17 +41,23 @@ public:
     [[nodiscard]] const std::string& getLocalPath() const { return m_transferFile.m_localPath;}
     [[nodiscard]] const std::string& getRemotePath() const {return m_transferFile.m_remotePath;}
     [[nodiscard]] const std::string& getUrl() const {return m_url;}
+	[[nodiscard]] TransferStatus::TransferOperation getJobOperation() const { return m_transferHandle.m_transferStatus.m_operation; }
     [[nodiscard]] uint64_t getJobId() const {return m_jobId;}
     [[nodiscard]] uint64_t getBytesTransferred() const {return m_transferFile.m_bytesTransfered;}
 
     void setLocalPath(const std::string& localPath) {m_transferFile.m_localPath = localPath;}
     void setRemotePath(const std::string& remotePath) {m_transferFile.m_remotePath = remotePath;}
     void setUrl(const std::string& url){m_url = url;}
-    void setJobId(uint64_t jobId) {m_jobId = jobId;}
+    void setJobId(uint64_t jobId);
     void setTransferHandle(std::shared_ptr<CURL> curlHandle) { m_transferHandle.m_curlHandle = curlHandle; }
     void closeStreamFile();
     void setFileTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
+	void setJobOperation(const TransferStatus::TransferOperation operation) { m_transferHandle.m_transferStatus.m_operation = operation; }
+	void setFileBytesTransferred(uint64_t bytesTransferred) { m_transferHandle.m_transferStatus.m_bytesTransferred = bytesTransferred; }
+	void setTotalBytes(uint64_t totalBytes) { m_transferHandle.m_transferStatus.m_totalBytes = totalBytes; }
     uint64_t createJob(const std::string localPath, const std::string remotePath, const std::string url);
+    void cancelJob();
+    void pauseJob();
 
     ~TransferJob();
 
@@ -61,12 +66,16 @@ private:
     static size_t dummyWriteCallback(void* ptr, size_t size, size_t nmemb, void* stream);
     static size_t ReadCallback(void *buffer, size_t size, size_t nmemb, void* parent);
 
+    static int xferinfoCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
+
 public:
     void downloadFile();
-    void uploadFile(const std::string& url);
+	void resumeDownloadFile();
+	void resumeUploadFile();
+    void uploadFile();
     void copyFile();
-    void moveFile(const std::string& url);
-    void deleteFile(const std::string& url);
+    void moveFile();
+    void deleteFile();
     void deleteLocalFile(const std::string& path);
     void createDirectory(const std::string& path);
 };

@@ -2,6 +2,7 @@
 #include <iostream> //TODO: DELETE
 #include <sstream>
 #include <algorithm>
+#include <Utilities/Commons.h>
 #include "Utilities/Logger.h"
 
 std::string urlEncode(const std::string& url) {
@@ -18,9 +19,68 @@ std::string urlEncode(const std::string& url) {
     return encoded.str();
 }
 
+time_t DirectoryCache::parseDateFromLs(const std::string& monthStr, const std::string& dayStr, const std::string& timeOrYearStr) {
+    static const std::unordered_map<std::string, int> monthMap = {
+        {"Jan", 0}, {"Feb", 1}, {"Mar", 2}, {"Apr", 3},
+        {"May", 4}, {"Jun", 5}, {"Jul", 6}, {"Aug", 7},
+        {"Sep", 8}, {"Oct", 9}, {"Nov", 10}, {"Dec", 11}
+    };
+
+    struct tm tm = {};
+    auto monthIt = monthMap.find(monthStr);
+
+    if (monthIt == monthMap.end()) {
+        return 0; // Invalid month
+    }
+
+    tm.tm_mon = monthIt->second;
+    tm.tm_mday = std::stoi(dayStr);
+
+    time_t now = time(nullptr);
+    struct tm* now_tm = localtime(&now);
+
+    if (timeOrYearStr.find(':') != std::string::npos) {
+        // If it's time format, assign current year
+        int hour = std::stoi(timeOrYearStr.substr(0, 2));
+        int minute = std::stoi(timeOrYearStr.substr(3, 2));
+        tm.tm_hour = hour;
+        tm.tm_min = minute;
+        tm.tm_sec = 0;
+        tm.tm_year = now_tm->tm_year;
+        tm.tm_isdst = -1;
+        
+        // Normalize
+        time_t file_time = mktime(&tm);
+
+        // If the parsed date is in the future by more than 6 months, it was likely from last year
+        if (file_time > now && (file_time - now) > (6 * 30 * 24 * 3600)) {
+            tm.tm_year -= 1;
+            file_time = mktime(&tm);
+        }
+        // If the parsed date is too old, correct it
+        else if (file_time < now && (now - file_time) >(6 * 30 * 24 * 3600)) {
+            tm.tm_year += 1;
+            file_time = mktime(&tm);
+        }
+
+        return file_time;
+    }
+    else {
+        // Year format case
+        int year = std::stoi(timeOrYearStr);
+        tm.tm_year = year - 1900;
+        tm.tm_hour = 0;
+        tm.tm_min = 0;
+        tm.tm_sec = 0;
+        return mktime(&tm);
+    }
+}
+
+
 bool DirectoryCache::initialize(const std::string& host, const std::string& username, std::string& password) {
 	m_curlHandle = CurlUniquePtr(curl_easy_init());
     m_curlCode = 0;
+
 	if (m_curlHandle) {
         char* encodedPassword = curl_easy_escape(m_curlHandle.get(), password.c_str(), 0);
         password = std::string(encodedPassword);
@@ -40,11 +100,12 @@ bool DirectoryCache::initialize(const std::string& host, const std::string& user
         else {
             m_initialized = true;
         }
-        curl_easy_reset(m_curlHandle.get());
+        //curl_easy_reset(m_curlHandle.get());
     }
     else {
         m_initialized = false;
     }
+
     return m_initialized;
 }
 
@@ -53,99 +114,131 @@ void DirectoryCache::prefetchDirectories(const std::string& path, int depth) {
     if (depth == 0) {
         return;
     }
+
+    //logger().debug() << "Pre fetching directory: " << path;
+    
     std::vector<DirectoryEntry> entries;
     entries = listDirectory(path);
+
     if (entries.empty()) {
-            return;
+        return;
     }
+	
     {
-       // QMutexLocker locker(&m_mutex);
+        QMutexLocker locker(&m_mutex);
+        m_cache[path] = entries;
     }
-    m_cache[path] = entries;
+    int i = 0;
+    int currentModulo = 1000;
     for (const auto& entry : entries) {
         if (entry.m_isDirectory && (entry.m_name != ".." && entry.m_name != ".")) {
             std::string subPath;
             subPath = path + entry.m_name + "/";
             prefetchDirectories(subPath, depth - 1);
         }
+
+        i++;
+        if (i > currentModulo) {
+			currentModulo *= 1.5; // Increase the modulo to reduce frequency of updates
+        }
+        if (i % currentModulo == 0) {
+			emit onDirectoryUpdated(path);
+        }
     }
-    logger().debug() << "Pre fetching directory: " << path;
+    
 
 }
 
 void DirectoryCache::updateDirectoryCache(const std::string& path, int depth) {
+	logger().debug() << "Updating directory cache for path: " << path << " with depth: " << depth;
     prefetchDirectories(path, depth);
 }
 
 std::vector<DirectoryEntry> DirectoryCache::listDirectory(const std::string& path) {
-    //QMutexLocker locker(&m_mutex);
     std::vector<DirectoryEntry> entries;
-    if (!m_curlHandle.get()) {
-        return entries;
-    }
     std::string encodedPath = urlEncode(path);
     std::string fullUrl = m_baseUrl + encodedPath;
     std::string response;
-   // std::string encodedUrl = urlEncode(fullUrl);
+    CURLcode res = (CURLcode)-1;
 
+    {
+        QMutexLocker locker(&m_mutex);
+        
+        if (!m_curlHandle.get()) {
+            return entries;
+        }
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
+    
+        res = curl_easy_perform(m_curlHandle.get());   
+     
+        if (res != CURLE_OK) {
+            m_curlCode = static_cast<int>(res);
+		
+           // curl_easy_reset(m_curlHandle.get());
 
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_URL, fullUrl.c_str());
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(m_curlHandle.get(), CURLOPT_WRITEDATA, &response);
-
-    CURLcode res = curl_easy_perform(m_curlHandle.get());
-
-    if (res != CURLE_OK) {
-        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << " DIRPATH: " << path << std::endl;
-        //logger().error() << curl_easy_strerror(res) << ": " << path;
-        logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
-        m_curlCode = static_cast<int>(res);
-        curl_easy_reset(m_curlHandle.get());
-        return entries;
+            logger().error() << "Failed to list Directory:" << path << "'. Error: " << std::string(curl_easy_strerror(res));
+        
+            return entries;
+        }
+        //curl_easy_reset(m_curlHandle.get());
     }
-    else {
-        logger().debug() << "Directory listing of: " << path << " Successful.";
-    }
+
     parseResponse(entries, response);
-    curl_easy_reset(m_curlHandle.get());
     return entries;
 }
 
 bool DirectoryCache::isFile(const std::string& path) {
-    QMutexLocker locker(&m_mutex);
     size_t pos = path.find_last_of("/");
-    std::string directoryPath = path.substr(0, pos);
+    std::string directoryPath = path.substr(0, pos + 1);
     std::string fileName = path.substr(pos + 1, path.size());
-    if (isPathInCache(directoryPath)) {
-        return false;
-    }
-    const auto& entries = m_cache.at(directoryPath);
-    auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
-        return entry.m_name == fileName; });
-
+   
+    QMutexLocker locker(&m_mutex);
     
-    return it != entries.end() && it->m_isFile;
+    try {
+        const auto& entries = m_cache.at(directoryPath);
+        auto it = std::find_if(entries.begin(), entries.end(), [&](const DirectoryEntry& entry) {
+            return entry.m_name == fileName; 
+        });
+        return it != entries.end() && it->m_isFile;
+    }
+    catch (const std::out_of_range& e) {
+        logger().error() << "Directory not found in cache: " << directoryPath;
+        return false;
+	}
+
 }
 
-const uint64_t DirectoryCache::getTotalBytes(const std::string& path, const std::string& fileName) {
-   // QMutexLocker locker(&m_mutex);
-    if (!isPathInCache(path)) {
+const uint64_t DirectoryCache::getTotalBytes(const std::string& path) {
+    const std::string remoteDirectoryPath = path.substr(0, path.find_last_of('/') + 1);
+	const std::string remoteFileName = Commons::FileName(path);
+
+	logger().debug() << "Getting total bytes for file: " << remoteFileName << " in directory: " << remoteDirectoryPath;
+    
+    if (!isPathInCache(remoteDirectoryPath)) {
+		logger().error() << "Directory not found in cache: " << remoteDirectoryPath;
         return 0;
     }
-    auto& entries = m_cache.find(path)->second;
-    auto it = std::find_if(entries.begin(), entries.end(), [&fileName](const DirectoryEntry& entry) {
-        return entry.m_name == fileName;
-        });
+
+    auto& entries = m_cache.find(remoteDirectoryPath)->second;
+
+    auto it = std::find_if(entries.begin(), entries.end(), [&remoteFileName](const DirectoryEntry& entry) {
+        return entry.m_name == remoteFileName;
+    });
+
     return it != entries.end() ? it->m_totalBytes : 0;
 }
 
 bool DirectoryCache::getCachedDirectory(const std::string& path, std::vector<DirectoryEntry>& entries)  {
     QMutexLocker locker(&m_mutex);
     auto it = m_cache.find(path);
+
     if (it != m_cache.end()) {
         entries = it->second;
         return true;
     }
+
     return false;
 }
 
@@ -156,10 +249,12 @@ bool DirectoryCache::isRegularFile(const std::string& filePath) {
 
 void DirectoryCache::refreshDirectory(const std::string& path) {
     std::vector<DirectoryEntry> entries = listDirectory(path);
-     m_cache[path] = entries;
+    
     {
-       // QMutexLocker locker(&m_mutex);
+        QMutexLocker locker(&m_mutex);
+        m_cache[path] = entries;
     }
+
     emit onDirectoryUpdated(path);
 }
 
@@ -196,15 +291,29 @@ void DirectoryCache::parseResponse(std::vector<DirectoryEntry>& entries, const s
         if (day.size() == 1) {
             day = '0' + day;
         }
+
         DirectoryEntry entry;
-        entry.m_isDirectory = permissions[0] == 'd' ? true : false;
-        entry.m_isSymLink = permissions[0] == 'l' ? true : false;
-        entry.m_isFile = permissions[0] == '-' ? true : false;
-        entry.m_totalBytes = std::stoul(strSize);
+        entry.m_isDirectory = permissions[0] == 'd';
+        entry.m_isSymLink = permissions[0] == 'l';
+        entry.m_isFile = permissions[0] == '-';
+		entry.m_isHidden = name[0] == '.' || entry.m_isSymLink;
         entry.m_name = name;
-        entry.m_lastModified = month + " " + day + " " + timeOrYear;
         entry.m_owner = owner;
         entry.m_permissions = permissions;
+        entry.m_tLastModified = parseDateFromLs(month, day, timeOrYear);
+        entry.m_totalBytes = std::stoul(strSize);
+
+        if(entry.m_isDirectory) {
+            entry.m_type = "Folder";
+        }
+        else if (entry.m_isFile) {
+            auto dot = entry.m_name.rfind('.');
+            entry.m_type = (dot == std::string::npos) ? "" : entry.m_name.substr(dot + 1);
+            entry.m_type += " File";
+        }
+        else {
+            entry.m_type = "Unknown";
+	    }
 
         entries.push_back(entry);
     }
