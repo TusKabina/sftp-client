@@ -1,3 +1,4 @@
+
 # SFTP Client
 SFTP Client is multi-threaded C++ Qt application for managing files over SFTP, designed for Linux systems. The application is still in active development with plans to add more features in the future.
 
@@ -16,27 +17,27 @@ SFTP Client is multi-threaded C++ Qt application for managing files over SFTP, d
 - Rename local file 
 - Delete local file 
 
-## Requirements
+# Requirements
 - **QT 5.15.2** 
 - **libcurl** 
 - **CMake 3.19+** 
 
-## Build on Linux
+# Build on Linux
 ```bash
 git clone <repo_url>
 cd sftp-client
 export QTDIR=/path/to/Qt/5.15.2/gcc_64
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=QTDIR
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QTDIR
 cmake --build .
 ```
 
-```bash
+```
 Run:
 ./SftpClient
 ```
 
-## Build With Visual Studio with cross-platform
+# Build With Visual Studio (cross-platform)
 1. Clone the repository:
 ```bash
 git clone <repo_url>
