@@ -1,8 +1,8 @@
 # Changelog
 
-## UNRELEASED
+## 0.7.0 - 2025/08/08
 - Transfer status now shows the operation type.
-- Added ability to pause and resume downloads.
+- Added ability to pause and resume downloads and uploads.
 - Added ability to rename files and directories on local machine.
 - Active Download and uploads can now be cancelled.
 - Operations can now be removed from transfer status.
